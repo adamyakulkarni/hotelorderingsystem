@@ -6,6 +6,44 @@ const path = require('path');
 const app = express();
 const db = new sqlite3.Database('./database.db');
 
+const multer = require('multer');
+const path = require('path');
+
+// Configure local file storage
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => cb(null, 'src/public/uploads/'),
+    filename: (req, file, cb) => {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        cb(null, uniqueSuffix + path.extname(file.originalname));
+    }
+});
+
+const upload = multer({ storage: storage });
+
+// API Route: Register Restaurant with Photo Upload
+app.post('/api/restaurants/register', upload.single('image'), (req, res) => {
+    const { name, email, password, address, lat, lng } = req.body;
+    const imageUrl = req.file ? `/uploads/${req.file.filename}` : '/uploads/default.jpg';
+
+    const sql = `INSERT INTO restaurants (name, email, password_hash, address, lat, lng, image_url) VALUES (?, ?, ?, ?, ?, ?, ?)`;
+    db.run(sql, [name, email, password, address, lat, lng, imageUrl], function(err) {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json({ success: true, restaurantId: this.lastID, imageUrl });
+    });
+});
+
+// API Route: Add Menu Item with Photo
+app.post('/api/menu/add', upload.single('itemImage'), (req, res) => {
+    const { restaurantId, name, price, category } = req.body;
+    const imageUrl = req.file ? `/uploads/${req.file.filename}` : null;
+
+    const sql = `INSERT INTO menu_items (restaurant_id, name, price, category, image_url) VALUES (?, ?, ?, ?, ?)`;
+    db.run(sql, [restaurantId, name, price, category, imageUrl], function(err) {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json({ success: true, itemId: this.lastID });
+    });
+});
+
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
