@@ -3,13 +3,16 @@ const express = require('express');
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 
+// 1. Initialize Express App FIRST
+const app = express();
+
+// 2. Middleware & Static Asset Hosting
+app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-const app = express();
+// Database Connection
 const dbPath = path.join(__dirname, '..', 'database.db');
 const db = new sqlite3.Database(dbPath);
-
-app.use(express.json());
 
 // Helper: Haversine distance formula (in km)
 function calculateDistance(lat1, lon1, lat2, lon2) {
