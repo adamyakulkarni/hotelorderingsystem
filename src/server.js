@@ -4,51 +4,12 @@ const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 
 const app = express();
-const db = new sqlite3.Database('./database.db');
-
-const multer = require('multer');
-const path = require('path');
-
-// Configure local file storage
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => cb(null, 'src/public/uploads/'),
-    filename: (req, file, cb) => {
-        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        cb(null, uniqueSuffix + path.extname(file.originalname));
-    }
-});
-
-const upload = multer({ storage: storage });
-
-// API Route: Register Restaurant with Photo Upload
-app.post('/api/restaurants/register', upload.single('image'), (req, res) => {
-    const { name, email, password, address, lat, lng } = req.body;
-    const imageUrl = req.file ? `/uploads/${req.file.filename}` : '/uploads/default.jpg';
-
-    const sql = `INSERT INTO restaurants (name, email, password_hash, address, lat, lng, image_url) VALUES (?, ?, ?, ?, ?, ?, ?)`;
-    db.run(sql, [name, email, password, address, lat, lng, imageUrl], function(err) {
-        if (err) return res.status(500).json({ error: err.message });
-        res.json({ success: true, restaurantId: this.lastID, imageUrl });
-    });
-});
-
-// API Route: Add Menu Item with Photo
-app.post('/api/menu/add', upload.single('itemImage'), (req, res) => {
-    const { restaurantId, name, price, category } = req.body;
-    const imageUrl = req.file ? `/uploads/${req.file.filename}` : null;
-
-    const sql = `INSERT INTO menu_items (restaurant_id, name, price, category, image_url) VALUES (?, ?, ?, ?, ?)`;
-    db.run(sql, [restaurantId, name, price, category, imageUrl], function(err) {
-        if (err) return res.status(500).json({ error: err.message });
-        res.json({ success: true, itemId: this.lastID });
-    });
-});
+const dbPath = path.join(__dirname, '..', 'database.db');
+const db = new sqlite3.Database(dbPath);
 
 app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public')));
 
-
-// Calculate geographic distance in kilometers
+// Helper: Haversine distance formula (in km)
 function calculateDistance(lat1, lon1, lat2, lon2) {
     const R = 6371;
     const dLat = (lat2 - lat1) * (Math.PI / 180);
@@ -59,7 +20,7 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
     return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
 }
 
-// Endpoint 1: Fetch Nearby Restaurants
+// 1. Nearby Restaurants API
 app.get('/api/restaurants/nearby', (req, res) => {
     const userLat = parseFloat(req.query.lat) || 12.9716;
     const userLng = parseFloat(req.query.lng) || 77.5946;
@@ -69,18 +30,30 @@ app.get('/api/restaurants/nearby', (req, res) => {
 
         const results = rows.map(r => ({
             ...r,
-            distanceKm: calculateDistance(userLat, userLng, r.lat, r.lng).toFixed(2)
+            distanceKm: parseFloat(calculateDistance(userLat, userLng, r.lat, r.lng).toFixed(2))
         })).sort((a, b) => a.distanceKm - b.distanceKm);
 
         res.json(results);
     });
 });
 
+// 2. Fetch Menu Items for a Restaurant
+app.get('/api/restaurants/:id/menu', (req, res) => {
+    const restaurantId = req.params.id;
+    db.all("SELECT * FROM menu_items WHERE restaurant_id = ?", [restaurantId], (err, rows) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json(rows);
+    });
+});
 
-// Endpoint 2: Get Tables with Real-time Slot Availability
+// 3. Real-time Floorplan & Table Availability API
 app.get('/api/restaurants/:id/tables', (req, res) => {
     const restaurantId = req.params.id;
     const timeSlot = req.query.time; // Format: "YYYY-MM-DD HH:MM"
+
+    if (!timeSlot) {
+        return res.status(400).json({ error: "Query parameter 'time' is required (e.g., ?time=2026-10-01 19:00)" });
+    }
 
     const query = `
         SELECT t.*, 
@@ -99,19 +72,15 @@ app.get('/api/restaurants/:id/tables', (req, res) => {
     });
 });
 
-// Endpoint 3: Pre-order Checkout & Deposit Payment
+// 4. Pre-order Deposit & Booking Checkout API
 app.post('/api/checkout', (req, res) => {
     const { restaurantId, tableId, customerName, arrivalTime, cartItems } = req.body;
 
-    if (!cartItems || cartItems.length === 0) {
-        return res.status(400).json({ error: "Cart cannot be empty" });
+    if (!restaurantId || !tableId || !customerName || !arrivalTime || !cartItems || cartItems.length === 0) {
+        return res.status(400).json({ error: "Missing required booking details or empty cart" });
     }
 
-    // Calculate total and 20% deposit
-    const totalAmount = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-    const depositAmount = parseFloat((totalAmount * 0.20).toFixed(2));
-
-    // Double-check table conflict
+    // Double-booking check
     db.get(
         `SELECT id FROM reservations WHERE table_id = ? AND arrival_time = ? AND status = 'CONFIRMED'`,
         [tableId, arrivalTime],
@@ -120,7 +89,10 @@ app.post('/api/checkout', (req, res) => {
                 return res.status(409).json({ error: "Table is already booked for this time slot." });
             }
 
-            // Insert confirmed reservation
+            // Calculate food subtotal and 20% deposit
+            const totalAmount = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+            const depositAmount = parseFloat((totalAmount * 0.20).toFixed(2));
+
             const stmt = db.prepare(`
                 INSERT INTO reservations (restaurant_id, table_id, customer_name, arrival_time, deposit_paid, order_items_json)
                 VALUES (?, ?, ?, ?, ?, ?)
@@ -134,9 +106,9 @@ app.post('/api/checkout', (req, res) => {
                     res.json({
                         success: true,
                         bookingId: this.lastID,
-                        totalAmount,
+                        totalAmount: parseFloat(totalAmount.toFixed(2)),
                         depositPaid: depositAmount,
-                        message: "Reservation confirmed and deposit processed."
+                        message: "Reservation confirmed and deposit processed successfully."
                     });
                 }
             );
@@ -144,6 +116,28 @@ app.post('/api/checkout', (req, res) => {
     );
 });
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
+// 5. Onboard New Restaurant API
+app.post('/api/restaurants/register', (req, res) => {
+    const { name, address, lat, lng } = req.body;
 
+    if (!name || !address || !lat || !lng) {
+        return res.status(400).json({ error: "Missing fields: name, address, lat, lng are required" });
+    }
+
+    const defaultImage = "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=500";
+    const sql = `INSERT INTO restaurants (name, lat, lng, address, image_url) VALUES (?, ?, ?, ?, ?)`;
+
+    db.run(sql, [name, parseFloat(lat), parseFloat(lng), address, defaultImage], function (err) {
+        if (err) return res.status(500).json({ error: err.message });
+
+        const newId = this.lastID;
+        res.json({
+            success: true,
+            restaurantId: newId,
+            message: `Restaurant '${name}' onboarded successfully!`
+        });
+    });
+});
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`Backend API running on http://localhost:${PORT}`));
