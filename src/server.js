@@ -141,10 +141,9 @@ app.post('/api/restaurants/register', (req, res) => {
 
         const restaurantId = this.lastID;
 
-        // If food/menu items were provided during onboarding, insert them automatically
+        // If a initial menu item was provided, insert it into menu_items table
         if (Array.isArray(menuItems) && menuItems.length > 0) {
             const stmt = db.prepare(`INSERT INTO menu_items (restaurant_id, name, price, category, image_url) VALUES (?, ?, ?, ?, ?)`);
-            
             menuItems.forEach(item => {
                 stmt.run([restaurantId, item.name, parseFloat(item.price), item.category || 'General', item.imageUrl || '']);
             });
@@ -154,7 +153,7 @@ app.post('/api/restaurants/register', (req, res) => {
         res.json({
             success: true,
             restaurantId: restaurantId,
-            message: `Restaurant '${name}' onboarded successfully with menu items!`
+            message: `Restaurant '${name}' onboarded successfully!`
         });
     });
 });
