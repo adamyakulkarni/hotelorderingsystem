@@ -365,7 +365,7 @@
     const deposit = total * Number(CONFIG.DEPOSIT_RATE || 0.2);
 
     app.innerHTML = `
-      ${pageHead(r?.name || "Pre-order", `${r?.address \vert{}\vert{} ""} - ${formatDisplayDateTime(state.arrivalTime)}`, "tables")}
+      ${pageHead(r?.name || "Pre-order", `${r?.address || ""} - ${formatDisplayDateTime(state.arrivalTime)}`, "tables")}
       <div class="menu-layout">
         <section>
           <nav class="cats" aria-label="Menu categories">
