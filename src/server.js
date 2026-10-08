@@ -122,24 +122,39 @@ app.post('/api/checkout', (req, res) => {
 });
 
 // 5. Onboard New Restaurant API
+// 5. Expanded Onboard New Restaurant API
 app.post('/api/restaurants/register', (req, res) => {
-    const { name, address, lat, lng } = req.body;
+    const { name, address, lat, lng, imageUrl, openingTime, closingTime, menuItems } = req.body;
 
     if (!name || !address || !lat || !lng) {
-        return res.status(400).json({ error: "Missing fields: name, address, lat, lng are required" });
+        return res.status(400).json({ error: "Missing required fields: name, address, lat, lng" });
     }
 
-    const defaultImage = "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=500";
-    const sql = `INSERT INTO restaurants (name, lat, lng, address, image_url) VALUES (?, ?, ?, ?, ?)`;
+    const image = imageUrl || "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=500";
+    const open = openingTime || "09:00";
+    const close = closingTime || "22:00";
 
-    db.run(sql, [name, parseFloat(lat), parseFloat(lng), address, defaultImage], function (err) {
+    const sql = `INSERT INTO restaurants (name, lat, lng, address, image_url, opening_time, closing_time) VALUES (?, ?, ?, ?, ?, ?, ?)`;
+
+    db.run(sql, [name, parseFloat(lat), parseFloat(lng), address, image, open, close], function (err) {
         if (err) return res.status(500).json({ error: err.message });
 
-        const newId = this.lastID;
+        const restaurantId = this.lastID;
+
+        // If food/menu items were provided during onboarding, insert them automatically
+        if (Array.isArray(menuItems) && menuItems.length > 0) {
+            const stmt = db.prepare(`INSERT INTO menu_items (restaurant_id, name, price, category, image_url) VALUES (?, ?, ?, ?, ?)`);
+            
+            menuItems.forEach(item => {
+                stmt.run([restaurantId, item.name, parseFloat(item.price), item.category || 'General', item.imageUrl || '']);
+            });
+            stmt.finalize();
+        }
+
         res.json({
             success: true,
-            restaurantId: newId,
-            message: `Restaurant '${name}' onboarded successfully!`
+            restaurantId: restaurantId,
+            message: `Restaurant '${name}' onboarded successfully with menu items!`
         });
     });
 });
