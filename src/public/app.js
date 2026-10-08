@@ -457,6 +457,7 @@
   }
 
   // Expanded Restaurant Onboarding Form
+ // Expanded Restaurant Onboarding Form
   function renderPartner() {
     state.step = "partner";
 
@@ -490,7 +491,7 @@
 
           <div class="field">
             <label for="partnerImage">Photo URL (Image link)</label>
-            <input id="partnerImage" name="imageUrl" type="url" placeholder="https://images.unsplash.com/photo-...">
+            <input id="partnerImage" name="imageUrl" type="url" placeholder="https://images.unsplash.com/photo-1517248135467-4c7edcad34c4">
           </div>
 
           <div class="two">
