@@ -408,11 +408,19 @@
 
   function menuItem(item) {
     const qty = cartQuantity(item.id);
+    const photo = item.image_url
+      ? `<img src="${esc(item.image_url)}" alt="${esc(item.name)}" style="width: 70px; height: 70px; object-fit: cover; border-radius: 6px; margin-right: 12px;">`
+      : "";
+
     return `
-      <div class="item">
-        <div>
-          <h3>${esc(item.name)}</h3>
-          <span class="item-price">${money(item.price)}</span>
+      <div class="item" style="display: flex; align-items: center; justify-content: space-between;">
+        <div style="display: flex; align-items: center;">
+          ${photo}
+          <div>
+            <h3>${esc(item.name)}</h3>
+            ${item.description ? `<p style="font-size: 0.85rem; color: #666; margin: 2px 0;">${esc(item.description)}</p>` : ""}
+            <span class="item-price">${money(item.price)}</span>
+          </div>
         </div>
         <div>
           ${qty
@@ -456,89 +464,6 @@
     return d.toLocaleString([], { dateStyle: "medium", timeStyle: "short" });
   }
 
-function renderPartner() {
-    state.step = "partner";
-
-    app.innerHTML = `
-      <section class="partner">
-        <h1>Partner with ${esc(CONFIG.APP_NAME)}</h1>
-        <p>Add your restaurant details, operating hours, and initial menu items.</p>
-
-        <form id="partnerForm" class="panel">
-          <h3>Restaurant Details</h3>
-          <div class="field">
-            <label for="partnerName">Restaurant name</label>
-            <input id="partnerName" name="name" required maxlength="120" placeholder="e.g. Spice Garden">
-          </div>
-
-          <div class="field">
-            <label for="partnerAddress">Address</label>
-            <input id="partnerAddress" name="address" required maxlength="250" placeholder="Street, area, city">
-          </div>
-
-          <div class="two">
-            <div class="field">
-              <label for="partnerLat">Latitude</label>
-              <input id="partnerLat" name="lat" type="number" step="any" required placeholder="12.9716">
-            </div>
-            <div class="field">
-              <label for="partnerLng">Longitude</label>
-              <input id="partnerLng" name="lng" type="number" step="any" required placeholder="77.5946">
-            </div>
-          </div>
-
-          <div class="field">
-            <label for="partnerImage">Photo URL (Image link)</label>
-            <input id="partnerImage" name="imageUrl" type="url" placeholder="https://images.unsplash.com/photo-1517248135467">
-          </div>
-
-          <div class="two">
-            <div class="field">
-              <label for="partnerOpen">Opening Time</label>
-              <input id="partnerOpen" name="openingTime" type="time" value="09:00">
-            </div>
-            <div class="field">
-              <label for="partnerClose">Closing Time</label>
-              <input id="partnerClose" name="closingTime" type="time" value="22:00">
-            </div>
-          </div>
-
-          <hr style="margin: 20px 0; border: 0; border-top: 1px solid #ccc;">
-
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-            <h3 style="margin:0;">Menu Items</h3>
-            <button type="button" class="btn ghost" data-action="add-menu-row">+ Add Another Dish</button>
-          </div>
-
-          <div id="menuItemsContainer">
-            <div class="menu-item-row" style="padding: 10px; border: 1px dashed #ccc; border-radius: 6px; margin-bottom: 10px;">
-              <div class="field">
-                <label>Dish Name</label>
-                <input name="itemName" placeholder="e.g. Fried Rice" required>
-              </div>
-              <div class="two">
-                <div class="field">
-                  <label>Price ($)</label>
-                  <input name="itemPrice" type="number" step="0.01" placeholder="12.99" required>
-                </div>
-                <div class="field">
-                  <label>Category</label>
-                  <input name="itemCategory" placeholder="e.g. Main Course">
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <p class="error-text" id="partnerError" aria-live="polite"></p>
-
-          <button class="btn primary block" type="submit">
-            Register restaurant
-          </button>
-        </form>
-      </section>
-    `;
-  }
-
 async function submitPartnerForm(form) {
     const errorEl = $("#partnerError", form);
     errorEl.textContent = "";
@@ -556,7 +481,6 @@ async function submitPartnerForm(form) {
       return;
     }
 
-    // Collect all menu items dynamically from the rows
     const menuRows = $$(".menu-item-row", form);
     const menuItems = [];
 
@@ -564,12 +488,16 @@ async function submitPartnerForm(form) {
       const itemName = $("input[name='itemName']", row)?.value.trim();
       const itemPrice = parseFloat($("input[name='itemPrice']", row)?.value);
       const itemCategory = $("input[name='itemCategory']", row)?.value.trim();
+      const itemDescription = $("input[name='itemDescription']", row)?.value.trim();
+      const itemImageUrl = $("input[name='itemImageUrl']", row)?.value.trim();
 
       if (itemName && !Number.isNaN(itemPrice)) {
         menuItems.push({
           name: itemName,
           price: itemPrice,
-          category: itemCategory || "Main Course"
+          category: itemCategory || "Main Course",
+          description: itemDescription || "",
+          imageUrl: itemImageUrl || ""
         });
       }
     }
@@ -788,6 +716,40 @@ async function submitPartnerForm(form) {
   document.addEventListener("click", e => {
     const actionBtn = e.target.closest("[data-action]");
     if (!actionBtn) return;
+     if (action === "add-menu-row") {
+      const container = $("#menuItemsContainer");
+      if (container) {
+        const row = document.createElement("div");
+        row.className = "menu-item-row";
+        row.style.cssText = "padding: 12px; border: 1px dashed #ccc; border-radius: 6px; margin-bottom: 12px; position: relative;";
+        row.innerHTML = `
+          <button type="button" data-action="remove-menu-row" style="position: absolute; top: 5px; right: 5px; background: none; border: none; font-size: 18px; cursor: pointer;">×</button>
+          <div class="field">
+            <label>Dish Name</label>
+            <input name="itemName" placeholder="e.g. Spring Rolls" required>
+          </div>
+          <div class="two">
+            <div class="field">
+              <label>Price ($)</label>
+              <input name="itemPrice" type="number" step="0.01" placeholder="8.99" required>
+            </div>
+            <div class="field">
+              <label>Category</label>
+              <input name="itemCategory" placeholder="e.g. Starters">
+            </div>
+          </div>
+          <div class="field">
+            <label>Description</label>
+            <input name="itemDescription" placeholder="e.g. Crispy rolls filled with vegetables">
+          </div>
+          <div class="field">
+            <label>Food Photo URL</label>
+            <input name="itemImageUrl" type="url" placeholder="https://images.unsplash.com/photo-1541832676">
+          </div>
+        `;
+        container.appendChild(row);
+      }
+    }
 
     const action = actionBtn.dataset.action;
     const id = actionBtn.dataset.id;
