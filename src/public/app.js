@@ -1,6 +1,5 @@
 /* ==========================================================================
    app.js - Tablemate frontend
-   Works with the API exposed by src/server.js.
    ========================================================================== */
 
 (() => {
@@ -222,12 +221,150 @@
     `;
   }
 
+  function renderPartner() {
+    state.step = "partner";
+
+    app.innerHTML = `
+      <section class="partner">
+        <h1>Partner with ${esc(CONFIG.APP_NAME)}</h1>
+        <p>Add your restaurant details, operating hours, and menu items with descriptions and photos.</p>
+
+        <form id="partnerForm" class="panel">
+          <h3>Restaurant Details</h3>
+          <div class="field">
+            <label for="partnerName">Restaurant name</label>
+            <input id="partnerName" name="name" required maxlength="120" placeholder="e.g. Spice Garden">
+          </div>
+
+          <div class="field">
+            <label for="partnerAddress">Address</label>
+            <input id="partnerAddress" name="address" required maxlength="250" placeholder="Street, area, city">
+          </div>
+
+          <div class="two">
+            <div class="field">
+              <label for="partnerLat">Latitude</label>
+              <input id="partnerLat" name="lat" type="number" step="any" required placeholder="12.9716">
+            </div>
+            <div class="field">
+              <label for="partnerLng">Longitude</label>
+              <input id="partnerLng" name="lng" type="number" step="any" required placeholder="77.5946">
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="partnerImage">Photo URL (Image link)</label>
+            <input id="partnerImage" name="imageUrl" type="url" placeholder="https://images.unsplash.com/photo-1517248135467">
+          </div>
+
+          <div class="two">
+            <div class="field">
+              <label for="partnerOpen">Opening Time</label>
+              <input id="partnerOpen" name="openingTime" type="time" value="09:00">
+            </div>
+            <div class="field">
+              <label for="partnerClose">Closing Time</label>
+              <input id="partnerClose" name="closingTime" type="time" value="22:00">
+            </div>
+          </div>
+
+          <hr style="margin: 20px 0; border: 0; border-top: 1px solid #ccc;">
+
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <h3 style="margin:0;">Menu Items</h3>
+            <button type="button" class="btn ghost" data-action="add-menu-row">+ Add Another Dish</button>
+          </div>
+
+          <div id="menuItemsContainer">
+            <div class="menu-item-row" style="padding: 12px; border: 1px dashed #ccc; border-radius: 6px; margin-bottom: 12px;">
+              <div class="field">
+                <label>Dish Name</label>
+                <input name="itemName" placeholder="e.g. Fried Rice" required>
+              </div>
+              <div class="two">
+                <div class="field">
+                  <label>Price ($)</label>
+                  <input name="itemPrice" type="number" step="0.01" placeholder="12.99" required>
+                </div>
+                <div class="field">
+                  <label>Category</label>
+                  <input name="itemCategory" placeholder="e.g. Main Course">
+                </div>
+              </div>
+              <div class="field">
+                <label>Description</label>
+                <input name="itemDescription" placeholder="e.g. Stir-fried rice cooked with fresh veggies and spices">
+              </div>
+              <div class="field">
+                <label>Food Photo URL</label>
+                <input name="itemImageUrl" type="url" placeholder="https://images.unsplash.com/photo-1603133872878">
+              </div>
+            </div>
+          </div>
+
+          <p class="error-text" id="partnerError" aria-live="polite"></p>
+
+          <button class="btn primary block" type="submit">
+            Register restaurant
+          </button>
+        </form>
+      </section>
+    `;
+  }
+
+  async function submitPartnerForm(form) {
+    const errorEl = $("#partnerError", form);     errorEl.textContent = "";      const name = form.name.value.trim();     const address = form.address.value.trim();     const lat = parseFloat(form.lat.value);     const lng = parseFloat(form.lng.value);     const imageUrl = form.imageUrl.value.trim();     const openingTime = form.openingTime.value;     const closingTime = form.closingTime.value;      if (!name \vert{}\vert{} !address \vert{}\vert{} Number.isNaN(lat) \vert{}\vert{} Number.isNaN(lng)) {       errorEl.textContent = "Please fill in all required restaurant fields.";       return;     }      const menuRows = $$(".menu-item-row", form);
+    const menuItems = [];
+
+    for (const row of menuRows) {
+      const itemName = $("input[name='itemName']", row)?.value.trim();
+      const itemPrice = parseFloat($("input[name='itemPrice']", row)?.value);
+      const itemCategory = $("input[name='itemCategory']", row)?.value.trim();
+      const itemDescription = $("input[name='itemDescription']", row)?.value.trim();
+      const itemImageUrl = $("input[name='itemImageUrl']", row)?.value.trim();
+
+      if (itemName && !Number.isNaN(itemPrice)) {
+        menuItems.push({
+          name: itemName,
+          price: itemPrice,
+          category: itemCategory || "Main Course",
+          description: itemDescription || "",
+          imageUrl: itemImageUrl || ""
+        });
+      }
+    }
+
+    const button = $("button[type=submit]", form);
+    setLoading(button, true, "Registering...");
+
+    try {
+      const result = await Api.registerRestaurant({
+        name,
+        address,
+        lat,
+        lng,
+        imageUrl,
+        openingTime,
+        closingTime,
+        menuItems
+      });
+
+      showBanner(result.message || "Restaurant registered successfully!", "success");
+      await loadRestaurants();
+      location.hash = "#discover";
+    } catch (error) {
+      errorEl.textContent = error.message || "Failed to register restaurant.";
+    } finally {
+      setLoading(button, false);
+    }
+  }
+
   function renderTables() {
     const r = state.restaurant;
     const selected = state.selectedTable;
 
     app.innerHTML = `
-      ${pageHead(r?.name || "Choose a table", r?.address || "", "discover")}
+      ${pageHead(r?.name || "Choose a table", `${r?.address \vert{}\vert{} ""} - ${formatDisplayDateTime(state.arrivalTime)}`, "discover")}
       <section class="panel">
         <div class="controls">
           <div class="field">
@@ -365,7 +502,7 @@
     const deposit = total * Number(CONFIG.DEPOSIT_RATE || 0.2);
 
     app.innerHTML = `
-      ${pageHead(r?.name || "Pre-order", `${r?.address || ""} - ${formatDisplayDateTime(state.arrivalTime)}`, "tables")}
+      ${pageHead(r?.name || "Pre-order", `${r?.address \vert{}\vert{} ""} - ${formatDisplayDateTime(state.arrivalTime)}`, "tables")}
       <div class="menu-layout">
         <section>
           <nav class="cats" aria-label="Menu categories">
@@ -462,69 +599,6 @@
     const d = new Date(value);
     if (Number.isNaN(d.getTime())) return value.replace("T", " ");
     return d.toLocaleString([], { dateStyle: "medium", timeStyle: "short" });
-  }
-
-async function submitPartnerForm(form) {
-    const errorEl = $("#partnerError", form);
-    errorEl.textContent = "";
-
-    const name = form.name.value.trim();
-    const address = form.address.value.trim();
-    const lat = parseFloat(form.lat.value);
-    const lng = parseFloat(form.lng.value);
-    const imageUrl = form.imageUrl.value.trim();
-    const openingTime = form.openingTime.value;
-    const closingTime = form.closingTime.value;
-
-    if (!name || !address || Number.isNaN(lat) || Number.isNaN(lng)) {
-      errorEl.textContent = "Please fill in all required restaurant fields.";
-      return;
-    }
-
-    const menuRows = $$(".menu-item-row", form);
-    const menuItems = [];
-
-    for (const row of menuRows) {
-      const itemName = $("input[name='itemName']", row)?.value.trim();
-      const itemPrice = parseFloat($("input[name='itemPrice']", row)?.value);
-      const itemCategory = $("input[name='itemCategory']", row)?.value.trim();
-      const itemDescription = $("input[name='itemDescription']", row)?.value.trim();
-      const itemImageUrl = $("input[name='itemImageUrl']", row)?.value.trim();
-
-      if (itemName && !Number.isNaN(itemPrice)) {
-        menuItems.push({
-          name: itemName,
-          price: itemPrice,
-          category: itemCategory || "Main Course",
-          description: itemDescription || "",
-          imageUrl: itemImageUrl || ""
-        });
-      }
-    }
-
-    const button = $("button[type=submit]", form);
-    setLoading(button, true, "Registering...");
-
-    try {
-      const result = await Api.registerRestaurant({
-        name,
-        address,
-        lat,
-        lng,
-        imageUrl,
-        openingTime,
-        closingTime,
-        menuItems
-      });
-
-      showBanner(result.message || "Restaurant registered successfully!", "success");
-      await loadRestaurants();
-      location.hash = "#discover";
-    } catch (error) {
-      errorEl.textContent = error.message || "Failed to register restaurant.";
-    } finally {
-      setLoading(button, false);
-    }
   }
 
   async function chooseRestaurant(id) {
@@ -697,7 +771,6 @@ async function submitPartnerForm(form) {
     }
   }
 
-  // Router and Global Event Listeners
   function handleRoute() {
     const hash = location.hash.replace("#", "") || "discover";
     if (hash === "partner") {
@@ -716,40 +789,6 @@ async function submitPartnerForm(form) {
   document.addEventListener("click", e => {
     const actionBtn = e.target.closest("[data-action]");
     if (!actionBtn) return;
-     if (action === "add-menu-row") {
-      const container = $("#menuItemsContainer");
-      if (container) {
-        const row = document.createElement("div");
-        row.className = "menu-item-row";
-        row.style.cssText = "padding: 12px; border: 1px dashed #ccc; border-radius: 6px; margin-bottom: 12px; position: relative;";
-        row.innerHTML = `
-          <button type="button" data-action="remove-menu-row" style="position: absolute; top: 5px; right: 5px; background: none; border: none; font-size: 18px; cursor: pointer;">×</button>
-          <div class="field">
-            <label>Dish Name</label>
-            <input name="itemName" placeholder="e.g. Spring Rolls" required>
-          </div>
-          <div class="two">
-            <div class="field">
-              <label>Price ($)</label>
-              <input name="itemPrice" type="number" step="0.01" placeholder="8.99" required>
-            </div>
-            <div class="field">
-              <label>Category</label>
-              <input name="itemCategory" placeholder="e.g. Starters">
-            </div>
-          </div>
-          <div class="field">
-            <label>Description</label>
-            <input name="itemDescription" placeholder="e.g. Crispy rolls filled with vegetables">
-          </div>
-          <div class="field">
-            <label>Food Photo URL</label>
-            <input name="itemImageUrl" type="url" placeholder="https://images.unsplash.com/photo-1541832676">
-          </div>
-        `;
-        container.appendChild(row);
-      }
-    }
 
     const action = actionBtn.dataset.action;
     const id = actionBtn.dataset.id;
@@ -788,6 +827,43 @@ async function submitPartnerForm(form) {
         );
       }
     }
+    if (action === "add-menu-row") {
+      const container = $("#menuItemsContainer");
+      if (container) {
+        const row = document.createElement("div");
+        row.className = "menu-item-row";
+        row.style.cssText = "padding: 12px; border: 1px dashed #ccc; border-radius: 6px; margin-bottom: 12px; position: relative;";
+        row.innerHTML = `
+          <button type="button" data-action="remove-menu-row" style="position: absolute; top: 5px; right: 5px; background: none; border: none; font-size: 18px; cursor: pointer;">×</button>
+          <div class="field">
+            <label>Dish Name</label>
+            <input name="itemName" placeholder="e.g. Spring Rolls" required>
+          </div>
+          <div class="two">
+            <div class="field">
+              <label>Price ($)</label>
+              <input name="itemPrice" type="number" step="0.01" placeholder="8.99" required>
+            </div>
+            <div class="field">
+              <label>Category</label>
+              <input name="itemCategory" placeholder="e.g. Starters">
+            </div>
+          </div>
+          <div class="field">
+            <label>Description</label>
+            <input name="itemDescription" placeholder="e.g. Crispy rolls filled with vegetables">
+          </div>
+          <div class="field">
+            <label>Food Photo URL</label>
+            <input name="itemImageUrl" type="url" placeholder="https://images.unsplash.com/photo-1541832676">
+          </div>
+        `;
+        container.appendChild(row);
+      }
+    }
+    if (action === "remove-menu-row") {
+      e.target.closest(".menu-item-row")?.remove();
+    }
   });
 
   document.addEventListener("change", e => {
@@ -808,6 +884,5 @@ async function submitPartnerForm(form) {
     }
   });
 
-  // Initial Load
   loadRestaurants();
 })();
