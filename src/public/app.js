@@ -84,7 +84,7 @@
     banner.innerHTML = `
       <div class="banner ${type}">
         <span>${esc(message)}</span>
-        <button type="button" aria-label="Dismiss" data-action="dismiss-banner">×</button>
+        <button type="button" aria-label="Dismiss" data-action="dismiss-banner">x</button>
       </div>
     `;
   }
@@ -97,7 +97,7 @@
     showBanner(error?.message || "Something went wrong.", "error");
   }
 
-  function setLoading(button, loading, text = "Working…") {
+  function setLoading(button, loading, text = "Working...") {
     if (!button) return;
     if (loading) {
       button.dataset.originalText = button.innerHTML;
@@ -140,7 +140,7 @@
   function pageHead(title, subtitle = "", backStep = "discover") {
     return `
       <div class="page-head">
-        <a class="back" href="#${backStep}" data-step="${backStep}">← Back</a>
+        <a class="back" href="#${backStep}" data-step="${backStep}">Back</a>
         <h1>${esc(title)}</h1>
         ${subtitle ? `<p class="addr">${esc(subtitle)}</p>` : ""}
         ${stepper()}
@@ -164,7 +164,7 @@
           <p class="addr">${esc(r.address)}</p>
           ${r.opening_time && r.closing_time ? `<p class="hint">Hours: ${esc(r.opening_time)} -${esc(r.closing_time)}</p>` : ""}
           <button class="btn primary" type="button" data-action="choose-restaurant" data-id="${esc(r.id)}">
-            View tables & menu
+            View tables and menu
           </button>
         </div>
       </article>
@@ -196,7 +196,7 @@
       </section>
       <section class="locbar">
         <div class="loc-info">
-          <span aria-hidden="true">📍</span>
+          <span aria-hidden="true">Location</span>
           <div>
             <strong>${state.locationSource === "gps" ? "Using your location" : "Showing restaurants near Bengaluru"}</strong>
             <span>${Number(state.location.lat).toFixed(4)}, ${Number(state.location.lng).toFixed(4)}</span>
@@ -248,7 +248,7 @@
         </div>
         <div class="floor" id="floor">
           ${state.loading
-            ? `<p class="floor-msg">Checking table availability…</p>`
+            ? `<p class="floor-msg">Checking table availability...</p>`
             : state.tables.length
             ? state.tables.map(tableButton).join("")
             : `<p class="floor-msg">Choose an arrival time to see available tables.</p>`
@@ -263,7 +263,7 @@
           }
         </p>
         <button class="btn primary" type="button" data-action="continue-menu" ${selected ? "" : "disabled"}>
-          Continue to menu →
+          Continue to menu
         </button>
       </div>
     `;
@@ -365,7 +365,7 @@
     const deposit = total * Number(CONFIG.DEPOSIT_RATE || 0.2);
 
     app.innerHTML = `
-      ${pageHead(r?.name || "Pre-order", `${r?.address \vert{}\vert{} ""} · ${formatDisplayDateTime(state.arrivalTime)}`, "tables")}
+      ${pageHead(r?.name || "Pre-order", `${r?.address \vert{}\vert{} ""} - ${formatDisplayDateTime(state.arrivalTime)}`, "tables")}
       <div class="menu-layout">
         <section>
           <nav class="cats" aria-label="Menu categories">
@@ -399,7 +399,7 @@
             <div class="rest-row"><span>Remaining at restaurant</span><span>${money(total - deposit)}</span></div>
           </div>
           <button class="btn primary block" type="button" data-action="checkout" ${cartItems().length ? "" : "disabled"}>
-            Confirm booking & pay deposit
+            Confirm booking and pay deposit
           </button>
         </aside>
       </div>
@@ -417,7 +417,7 @@
         <div>
           ${qty
             ? `<div class="stepper-qty">
-                <button type="button" aria-label="Decrease ${esc(item.name)}" data-action="qty" data-id="${esc(item.id)}" data-delta="-1">−</button>
+                <button type="button" aria-label="Decrease ${esc(item.name)}" data-action="qty" data-id="${esc(item.id)}" data-delta="-1">-</button>
                 <span>${qty}</span>
                 <button type="button" aria-label="Increase ${esc(item.name)}" data-action="qty" data-id="${esc(item.id)}" data-delta="1">+</button>
               </div>`
@@ -433,11 +433,11 @@
       <div class="line">
         <div>
           <div class="line-name">${esc(item.name)}</div>
-          <div class="line-sub">${money(item.price)} × ${item.quantity}</div>
+          <div class="line-sub">${money(item.price)} x ${item.quantity}</div>
         </div>
         <div class="line-total">${money(item.price * item.quantity)}</div>
         <div class="stepper-qty">
-          <button type="button" aria-label="Decrease ${esc(item.name)}" data-action="qty" data-id="${item.id}" data-delta="-1">−</button>
+          <button type="button" aria-label="Decrease ${esc(item.name)}" data-action="qty" data-id="${item.id}" data-delta="-1">-</button>
           <span>${item.quantity}</span>
           <button type="button" aria-label="Increase ${esc(item.name)}" data-action="qty" data-id="${item.id}" data-delta="1">+</button>
         </div>
@@ -456,8 +456,6 @@
     return d.toLocaleString([], { dateStyle: "medium", timeStyle: "short" });
   }
 
-  // Expanded Restaurant Onboarding Form
- // Expanded Restaurant Onboarding Form
   function renderPartner() {
     state.step = "partner";
 
@@ -491,7 +489,7 @@
 
           <div class="field">
             <label for="partnerImage">Photo URL (Image link)</label>
-            <input id="partnerImage" name="imageUrl" type="url" placeholder="https://images.unsplash.com/photo-1517248135467-4c7edcad34c4">
+            <input id="partnerImage" name="imageUrl" type="url" placeholder="https://images.unsplash.com/photo-1517248135467">
           </div>
 
           <div class="two">
@@ -565,7 +563,7 @@
     }
 
     const button = $("button[type=submit]", form);
-    setLoading(button, true, "Registering…");
+    setLoading(button, true, "Registering...");
 
     try {
       const result = await Api.registerRestaurant({
@@ -651,7 +649,7 @@
 
     dialogBody.innerHTML = `
       <div class="modal-inner">
-        <div class="modal-icon ok" aria-hidden="true">✓</div>
+        <div class="modal-icon ok" aria-hidden="true">OK</div>
         <h2 id="dlgTitle">Confirm your booking</h2>
         <p>Enter your name to reserve the table and place your pre-order.</p>
 
@@ -703,7 +701,7 @@
     }
 
     const button = $("button[type=submit]", form);
-    setLoading(button, true, "Confirming…");
+    setLoading(button, true, "Confirming...");
 
     try {
       const result = await Api.checkout({
@@ -733,7 +731,7 @@
 
     dialogBody.innerHTML = `
       <div class="modal-inner">
-        <div class="modal-icon ok" aria-hidden="true">✓</div>
+        <div class="modal-icon ok" aria-hidden="true">OK</div>
         <h2 id="dlgTitle">Booking confirmed</h2>
         <p>Thanks, ${esc(name)}. Your reservation has been recorded.</p>
         <dl class="kv">
