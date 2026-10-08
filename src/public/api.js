@@ -5,6 +5,46 @@ class ApiError extends Error {
   constructor(message, status) { super(message); this.status = status; }
 }
 
+// src/public/api.js
+window.Api = {
+  async request(path, options = {}) {
+    const res = await fetch(path, {
+      headers: { "Content-Type": "application/json", ...options.headers },
+      ...options,
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "API Request Failed");
+    return data;
+  },
+
+  nearby(lat, lng) {
+    return this.request(`/api/restaurants/nearby?lat=${lat}&lng=${lng}`);
+  },
+
+  tables(restaurantId, time) {
+    return this.request(`/api/restaurants/${restaurantId}/tables?time=${encodeURIComponent(time)}`);
+  },
+
+  menu(restaurantId) {
+    return this.request(`/api/restaurants/${restaurantId}/menu`);
+  },
+
+  checkout(payload) {
+    return this.request("/api/checkout", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  // Add this missing method:
+  registerRestaurant(payload) {
+    return this.request("/api/partners/register", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+};
+
 async function request(path, { method = "GET", body } = {}) {
   let res;
   try {
