@@ -456,13 +456,13 @@
     return d.toLocaleString([], { dateStyle: "medium", timeStyle: "short" });
   }
 
-  function renderPartner() {
+function renderPartner() {
     state.step = "partner";
 
     app.innerHTML = `
       <section class="partner">
         <h1>Partner with ${esc(CONFIG.APP_NAME)}</h1>
-        <p>Add your restaurant details, location photos, operating hours, and menu items.</p>
+        <p>Add your restaurant details, operating hours, and initial menu items.</p>
 
         <form id="partnerForm" class="panel">
           <h3>Restaurant Details</h3>
@@ -505,20 +505,27 @@
 
           <hr style="margin: 20px 0; border: 0; border-top: 1px solid #ccc;">
 
-          <h3>Initial Menu Item (Optional)</h3>
-          <div class="field">
-            <label for="itemName">Dish Name</label>
-            <input id="itemName" name="itemName" placeholder="e.g. Paneer Butter Masala">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <h3 style="margin:0;">Menu Items</h3>
+            <button type="button" class="btn ghost" data-action="add-menu-row">+ Add Another Dish</button>
           </div>
 
-          <div class="two">
-            <div class="field">
-              <label for="itemPrice">Price ($)</label>
-              <input id="itemPrice" name="itemPrice" type="number" step="0.01" placeholder="12.99">
-            </div>
-            <div class="field">
-              <label for="itemCategory">Category</label>
-              <input id="itemCategory" name="itemCategory" placeholder="e.g. Main Course">
+          <div id="menuItemsContainer">
+            <div class="menu-item-row" style="padding: 10px; border: 1px dashed #ccc; border-radius: 6px; margin-bottom: 10px;">
+              <div class="field">
+                <label>Dish Name</label>
+                <input name="itemName" placeholder="e.g. Fried Rice" required>
+              </div>
+              <div class="two">
+                <div class="field">
+                  <label>Price ($)</label>
+                  <input name="itemPrice" type="number" step="0.01" placeholder="12.99" required>
+                </div>
+                <div class="field">
+                  <label>Category</label>
+                  <input name="itemCategory" placeholder="e.g. Main Course">
+                </div>
+              </div>
             </div>
           </div>
 
@@ -533,33 +540,21 @@
   }
 
   async function submitPartnerForm(form) {
-    const errorEl = $("#partnerError", form);
-    errorEl.textContent = "";
-
-    const name = form.name.value.trim();
-    const address = form.address.value.trim();
-    const lat = parseFloat(form.lat.value);
-    const lng = parseFloat(form.lng.value);
-    const imageUrl = form.imageUrl.value.trim();
-    const openingTime = form.openingTime.value;
-    const closingTime = form.closingTime.value;
-
-    const itemName = form.itemName.value.trim();
-    const itemPrice = parseFloat(form.itemPrice.value);
-    const itemCategory = form.itemCategory.value.trim();
-
-    if (!name || !address || Number.isNaN(lat) || Number.isNaN(lng)) {
-      errorEl.textContent = "Please fill in all required fields.";
-      return;
-    }
-
+    const errorEl = $("#partnerError", form);     errorEl.textContent = "";      const name = form.name.value.trim();     const address = form.address.value.trim();     const lat = parseFloat(form.lat.value);     const lng = parseFloat(form.lng.value);     const imageUrl = form.imageUrl.value.trim();     const openingTime = form.openingTime.value;     const closingTime = form.closingTime.value;      if (!name \vert{}\vert{} !address \vert{}\vert{} Number.isNaN(lat) \vert{}\vert{} Number.isNaN(lng)) {       errorEl.textContent = "Please fill in all required restaurant fields.";       return;     }      // Collect all menu items dynamically from the rows     const menuRows = $$(".menu-item-row", form);
     const menuItems = [];
-    if (itemName && !Number.isNaN(itemPrice)) {
-      menuItems.push({
-        name: itemName,
-        price: itemPrice,
-        category: itemCategory || "Main Course"
-      });
+
+    for (const row of menuRows) {
+      const itemName = $("input[name='itemName']", row)?.value.trim();
+      const itemPrice = parseFloat($("input[name='itemPrice']", row)?.value);
+      const itemCategory = $("input[name='itemCategory']", row)?.value.trim();
+
+      if (itemName && !Number.isNaN(itemPrice)) {
+        menuItems.push({
+          name: itemName,
+          price: itemPrice,
+          category: itemCategory || "Main Course"
+        });
+      }
     }
 
     const button = $("button[type=submit]", form);
