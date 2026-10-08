@@ -10,14 +10,19 @@ db.serialize(() => {
     console.log("Initializing database schema...");
 
     // 1. Create Tables
-    db.run(`CREATE TABLE IF NOT EXISTS restaurants (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL,
-        lat REAL NOT NULL,
-        lng REAL NOT NULL,
-        address TEXT NOT NULL,
-        image_url TEXT
-    )`);
+ // In src/seed.js inside db.serialize()
+db.run(`
+  CREATE TABLE IF NOT EXISTS restaurants (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    lat REAL NOT NULL,
+    lng REAL NOT NULL,
+    address TEXT NOT NULL,
+    image_url TEXT,
+    opening_time TEXT DEFAULT '09:00',
+    closing_time TEXT DEFAULT '22:00'
+  )
+`);
 
     db.run(`CREATE TABLE IF NOT EXISTS tables (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
