@@ -68,6 +68,12 @@ db.serialize(() => {
       FOREIGN KEY (table_id) REFERENCES tables(id)
     )
   `);
+
+  db.run("ALTER TABLE restaurants ADD COLUMN opening_time TEXT DEFAULT '09:00'", () => {});
+  db.run("ALTER TABLE restaurants ADD COLUMN closing_time TEXT DEFAULT '22:00'", () => {});
+
+  // 3. Auto-migrate 'tables' table column
+  db.run("ALTER TABLE tables ADD COLUMN status TEXT NOT NULL DEFAULT 'AVAILABLE'", () => {});
   // Auto-migrate: Add missing 'status' column if it doesn't exist
   db.run("ALTER TABLE tables ADD COLUMN status TEXT NOT NULL DEFAULT 'AVAILABLE'", (err) => {
     if (err && !err.message.includes("duplicate column name")) {
