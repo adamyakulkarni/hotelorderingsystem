@@ -313,7 +313,7 @@
   }
 
   async function submitPartnerForm(form) {
-    const errorEl = $("#partnerError", form); errorEl.textContent = "";      const name = form.name.value.trim(); const address = form.address.value.trim(); const lat = parseFloat(form.lat.value); const lng = parseFloat(form.lng.value); const imageUrl = form.imageUrl.value.trim(); const openingTime = form.openingTime.value; const closingTime = form.closingTime.value;      if (!name \vert{}\vert{} !address \vert{}\vert{} Number.isNaN(lat) \vert{}\vert{} Number.isNaN(lng)) { errorEl.textContent = "Please fill in all required restaurant fields."; return; }      const menuRows = $$(".menu-item-row", form);
+    const errorEl = $("#partnerError", form); errorEl.textContent = "";      const name = form.name.value.trim(); const address = form.address.value.trim(); const lat = parseFloat(form.lat.value); const lng = parseFloat(form.lng.value); const imageUrl = form.imageUrl.value.trim(); const openingTime = form.openingTime.value; const closingTime = form.closingT0ime.value;     if ([name, address].some(val => !val) || [lat, lng].some(Number.isNaN)) { errorEl.textContent = "Please fill in all required restaurant fields."; return; }      const menuRows = $$(".menu-item-row", form);
     const menuItems = [];
 
     for (const row of menuRows) {
