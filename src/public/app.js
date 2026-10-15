@@ -600,8 +600,7 @@
     if (Number.isNaN(d.getTime())) return value.replace("T", " ");
     return d.toLocaleString([], { dateStyle: "medium", timeStyle: "short" });
   }
-
-  async function chooseRestaurant(id) {
+async function chooseRestaurant(id) {
     const restaurant = state.restaurants.find(r => Number(r.id) === Number(id));
     if (!restaurant) return;
 
@@ -614,7 +613,7 @@
 
     history.replaceState(null, "", "#tables");
     renderTables();
-    await loadTables();
+    await loadTables(); // <-- Fetches tables from the API for the initial arrival time
   }
 
   async function openMenu() {
@@ -771,12 +770,13 @@
     }
   }
 
-  function handleRoute() {
+ async function handleRoute() {
     const hash = location.hash.replace("#", "") || "discover";
     if (hash === "partner") {
       renderPartner();
     } else if (hash === "tables" && state.restaurant) {
       renderTables();
+      await loadTables();
     } else if (hash === "menu" && state.selectedTable) {
       renderMenu();
     } else {
