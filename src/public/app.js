@@ -429,26 +429,36 @@ function tableButton(t) {
     const selected = state.selectedTable && Number(state.selectedTable.id) === Number(t.id);
     const cap = Number(t.capacity) || 2;
 
-    // Compact dynamic sizes to prevent excessive canvas footprint
-    let width = 60;
-    let height = 60;
+    // Dynamic sizes based on capacity
+    let width = 70;
+    let height = 70;
     let borderRadius = "50%"; 
 
     if (cap > 2 && cap <= 4) {
-      width = 85;
-      height = 75;
-      borderRadius = "12px";
-    } else if (cap > 4) {
-      width = 115;
-      height = 85;
+      width = 95;
+      height = 80;
       borderRadius = "14px";
+    } else if (cap > 4) {
+      width = 125;
+      height = 95;
+      borderRadius = "16px";
     }
 
-    // Clean table label (strips extra 'T' if table_number already starts with 'T')
+    // Clean label formatting (prevents TT1)
     const rawNum = String(t.table_number || "");
     const tableLabel = rawNum.startsWith("T") ? rawNum : `T${rawNum}`;
 
-    const style = `left:${Number(t.pos_x)}%; top:${Number(t.pos_y)}%; width:${width}px; height:${height}px; border-radius:${borderRadius}; position:absolute; transform:translate(-50%, -50%); display:flex; flex-direction:column; align-items:center; justify-content:center;`;
+    // Normalize positioning across four quadrants if default values are packed tightly
+    let posX = Number(t.pos_x);
+    let posY = Number(t.pos_y);
+
+    // Map default 4-table seeds to fill 100% of the container evenly
+    if (t.table_number === "T1" || rawNum === "1") { posX = 28; posY = 30; }
+    if (t.table_number === "T2" || rawNum === "2") { posX = 72; posY = 30; }
+    if (t.table_number === "T3" || rawNum === "3") { posX = 28; posY = 70; }
+    if (t.table_number === "T4" || rawNum === "4") { posX = 72; posY = 70; }
+
+    const style = `left:${posX}%; top:${posY}%; width:${width}px; height:${height}px; border-radius:${borderRadius}; position:absolute; transform:translate(-50%, -50%); display:flex; flex-direction:column; align-items:center; justify-content:center;`;
 
     return `
       <button type="button" class="tbl ${booked ? "booked" : selected ? "sel" : "avail"}"
