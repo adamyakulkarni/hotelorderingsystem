@@ -312,52 +312,68 @@
     `;
   }
 
-  async function submitPartnerForm(form) {
-    const errorEl = $("#partnerError", form);     errorEl.textContent = "";      const name = form.name.value.trim();     const address = form.address.value.trim();     const lat = parseFloat(form.lat.value);     const lng = parseFloat(form.lng.value);     const imageUrl = form.imageUrl.value.trim();     const openingTime = form.openingTime.value;     const closingTime = form.closingTime.value;      if (!name \vert{}\vert{} !address \vert{}\vert{} Number.isNaN(lat) \vert{}\vert{} Number.isNaN(lng)) {       errorEl.textContent = "Please fill in all required restaurant fields.";       return;     }      const menuRows = $$(".menu-item-row", form);
-    const menuItems = [];
+ async function submitPartnerForm(form) {
+  const errorEl = $("#partnerError", form);
+  errorEl.textContent = "";
 
-    for (const row of menuRows) {
-      const itemName = $("input[name='itemName']", row)?.value.trim();
-      const itemPrice = parseFloat($("input[name='itemPrice']", row)?.value);
-      const itemCategory = $("input[name='itemCategory']", row)?.value.trim();
-      const itemDescription = $("input[name='itemDescription']", row)?.value.trim();
-      const itemImageUrl = $("input[name='itemImageUrl']", row)?.value.trim();
+  const name = form.name.value.trim();
+  const address = form.address.value.trim();
+  const lat = parseFloat(form.lat.value);
+  const lng = parseFloat(form.lng.value);
+  const imageUrl = form.imageUrl.value.trim();
+  const openingTime = form.openingTime.value;
+  const closingTime = form.closingTime.value;
 
-      if (itemName && !Number.isNaN(itemPrice)) {
-        menuItems.push({
-          name: itemName,
-          price: itemPrice,
-          category: itemCategory || "Main Course",
-          description: itemDescription || "",
-          imageUrl: itemImageUrl || ""
-        });
-      }
-    }
+  if (!name || !address || Number.isNaN(lat) || Number.isNaN(lng)) {
+    errorEl.textContent = "Please fill in all required restaurant fields.";
+    return;
+  }
 
-    const button = $("button[type=submit]", form);
-    setLoading(button, true, "Registering...");
+  const menuRows = $$(".menu-item-row", form);
+  const menuItems = [];
 
-    try {
-      const result = await Api.registerRestaurant({
-        name,
-        address,
-        lat,
-        lng,
-        imageUrl,
-        openingTime,
-        closingTime,
-        menuItems
+  for (const row of menuRows) {
+    const itemName = $("input[name='itemName']", row)?.value.trim();
+    const itemPrice = parseFloat($("input[name='itemPrice']", row)?.value);
+    const itemCategory = $("input[name='itemCategory']", row)?.value.trim();
+    const itemDescription = $("input[name='itemDescription']", row)?.value.trim();
+    const itemImageUrl = $("input[name='itemImageUrl']", row)?.value.trim();
+
+    if (itemName && !Number.isNaN(itemPrice)) {
+      menuItems.push({
+        name: itemName,
+        price: itemPrice,
+        category: itemCategory || "Main Course",
+        description: itemDescription || "",
+        imageUrl: itemImageUrl || ""
       });
-
-      showBanner(result.message || "Restaurant registered successfully!", "success");
-      await loadRestaurants();
-      location.hash = "#discover";
-    } catch (error) {
-      errorEl.textContent = error.message || "Failed to register restaurant.";
-    } finally {
-      setLoading(button, false);
     }
   }
+
+  const button = $("button[type=submit]", form);
+  setLoading(button, true, "Registering...");
+
+  try {
+    const result = await Api.registerRestaurant({
+      name,
+      address,
+      lat,
+      lng,
+      imageUrl,
+      openingTime,
+      closingTime,
+      menuItems
+    });
+
+    showBanner(result.message || "Restaurant registered successfully!", "success");
+    await loadRestaurants();
+    location.hash = "#discover";
+  } catch (error) {
+    errorEl.textContent = error.message || "Failed to register restaurant.";
+  } finally {
+    setLoading(button, false);
+  }
+}
 
   function renderTables() {
     const r = state.restaurant;
