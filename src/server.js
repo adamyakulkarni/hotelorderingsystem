@@ -15,6 +15,7 @@ const dbPath = path.join(__dirname, '..', 'database.db');
 const db = new sqlite3.Database(dbPath);
 
 db.serialize(() => {
+  // Base Tables Setup
   db.run(`
     CREATE TABLE IF NOT EXISTS restaurants (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -23,8 +24,8 @@ db.serialize(() => {
       lat REAL NOT NULL,
       lng REAL NOT NULL,
       image_url TEXT,
-      opening_time TEXT,
-      closing_time TEXT
+      opening_time TEXT DEFAULT '09:00',
+      closing_time TEXT DEFAULT '22:00'
     )
   `);
 
@@ -69,17 +70,12 @@ db.serialize(() => {
     )
   `);
 
+  // Schema Migrations (Ensures columns exist if database file was created on an older version)
+  db.run("ALTER TABLE menu_items ADD COLUMN description TEXT DEFAULT ''", () => {});
+  db.run("ALTER TABLE menu_items ADD COLUMN image_url TEXT DEFAULT ''", () => {});
   db.run("ALTER TABLE restaurants ADD COLUMN opening_time TEXT DEFAULT '09:00'", () => {});
   db.run("ALTER TABLE restaurants ADD COLUMN closing_time TEXT DEFAULT '22:00'", () => {});
-
-  // 3. Auto-migrate 'tables' table column
   db.run("ALTER TABLE tables ADD COLUMN status TEXT NOT NULL DEFAULT 'AVAILABLE'", () => {});
-  // Auto-migrate: Add missing 'status' column if it doesn't exist
-  db.run("ALTER TABLE tables ADD COLUMN status TEXT NOT NULL DEFAULT 'AVAILABLE'", (err) => {
-    if (err && !err.message.includes("duplicate column name")) {
-      console.log("Column 'status' already exists or altered.");
-    }
-  });
 });
 
 // Helper: Haversine distance formula (in km)
@@ -241,7 +237,7 @@ function handleRegister(req, res) {
 
     const restaurantId = this.lastID;
 
-    // Seed initial tables for new restaurant
+    // Seed default floor plan for newly registered restaurant
     const defaultTables = [
       ["T1", 2, 25, 30],
       ["T2", 4, 60, 30],
@@ -254,7 +250,7 @@ function handleRegister(req, res) {
     defaultTables.forEach(([num, cap, x, y]) => tableStmt.run(restaurantId, num, cap, x, y));
     tableStmt.finalize();
 
-    // Insert dynamic menu items
+    // Save menu items with descriptions & image URLs
     if (Array.isArray(menuItems) && menuItems.length > 0) {
       const menuStmt = db.prepare(
         `INSERT INTO menu_items (restaurant_id, name, price, category, description, image_url) VALUES (?, ?, ?, ?, ?, ?)`
