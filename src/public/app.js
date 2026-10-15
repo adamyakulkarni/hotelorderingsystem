@@ -429,45 +429,21 @@ function tableButton(t) {
     const selected = state.selectedTable && Number(state.selectedTable.id) === Number(t.id);
     const cap = Number(t.capacity) || 2;
 
-    // Dynamic sizes based on capacity
-    let width = 70;
-    let height = 70;
-    let borderRadius = "50%"; 
-
-    if (cap > 2 && cap <= 4) {
-      width = 95;
-      height = 80;
-      borderRadius = "14px";
-    } else if (cap > 4) {
-      width = 125;
-      height = 95;
-      borderRadius = "16px";
-    }
-
-    // Clean label formatting (prevents TT1)
+    // Clean label formatting
     const rawNum = String(t.table_number || "");
     const tableLabel = rawNum.startsWith("T") ? rawNum : `T${rawNum}`;
 
-    // Normalize positioning across four quadrants if default values are packed tightly
-    let posX = Number(t.pos_x);
-    let posY = Number(t.pos_y);
-
-    // Map default 4-table seeds to fill 100% of the container evenly
-    if (t.table_number === "T1" || rawNum === "1") { posX = 28; posY = 30; }
-    if (t.table_number === "T2" || rawNum === "2") { posX = 72; posY = 30; }
-    if (t.table_number === "T3" || rawNum === "3") { posX = 28; posY = 70; }
-    if (t.table_number === "T4" || rawNum === "4") { posX = 72; posY = 70; }
-
-    const style = `left:${posX}%; top:${posY}%; width:${width}px; height:${height}px; border-radius:${borderRadius}; position:absolute; transform:translate(-50%, -50%); display:flex; flex-direction:column; align-items:center; justify-content:center;`;
+    // Radius shape based on seats
+    const borderRadius = cap <= 2 ? "50%" : cap <= 4 ? "18px" : "24px";
 
     return `
       <button type="button" class="tbl ${booked ? "booked" : selected ? "sel" : "avail"}"
-        style="${style}"
+        style="width: 100%; height: 100%; min-height: 120px; border-radius: ${borderRadius}; display: flex; flex-direction: column; align-items: center; justify-content: center; justify-self: center; align-self: center;"
         ${booked ? "disabled" : ""}
         data-action="select-table" data-id="${esc(t.id)}"
         title="${booked ? "Booked" : `Table ${tableLabel},${t.capacity} seats`}">
-        <span class="tn">${esc(tableLabel)}</span>
-        <small>${esc(t.capacity)} seats</small>
+        <span class="tn" style="font-size: 1.25rem; font-weight: 700;">${esc(tableLabel)}</span>
+        <small style="font-size: 0.9rem; opacity: 0.85;">${esc(t.capacity)} seats</small>
       </button>
     `;
   }
