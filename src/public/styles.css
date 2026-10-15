@@ -123,7 +123,18 @@ h1, h2, h3 { font-family: var(--display); letter-spacing: -0.02em; margin: 0; }
 .sw.avail { background: var(--ok-soft); border-color: var(--ok); }
 .sw.booked { background: repeating-linear-gradient(45deg, var(--bad-soft), var(--bad-soft) 3px, #fff 3px, #fff 6px); border-color: var(--bad); }
 .sw.sel { background: var(--accent); border-color: var(--accent-dark); }
-.floor { position: relative; aspect-ratio: 16 / 9; min-height: 340px; margin: 1.25rem 1.25rem 1.5rem; border-radius: 18px; border: 1.5px solid var(--line);
+.floor { 
+  position: relative; 
+  aspect-ratio: 16 / 9; 
+  max-height: 320px; 
+  margin: 0.75rem 0 1rem; 
+  border-radius: 18px; 
+  border: 1.5px solid var(--line);
+  background-color: #FBFBFC; 
+  background-image: radial-gradient(#D5D9E1 1.2px, transparent 1.2px); 
+  background-size: 22px 22px; 
+  overflow: hidden;
+}
   background-color: #FBFBFC; background-image: radial-gradient(#D5D9E1 1.2px, transparent 1.2px); background-size: 22px 22px; }
 .floor-msg { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; padding: 1rem; color: var(--muted); margin: 0; }
 .floor-msg .btn { margin-top: .75rem; }
