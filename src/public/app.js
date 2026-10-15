@@ -429,20 +429,24 @@ function tableButton(t) {
     const selected = state.selectedTable && Number(state.selectedTable.id) === Number(t.id);
     const cap = Number(t.capacity) || 2;
 
-    // Dynamic width, height, and shape based on seat count
-    let width = 75;
-    let height = 75;
-    let borderRadius = "50%"; // Circular for 2-seaters
+    // Compact dynamic sizes to prevent excessive canvas footprint
+    let width = 60;
+    let height = 60;
+    let borderRadius = "50%"; 
 
     if (cap > 2 && cap <= 4) {
-      width = 105;
-      height = 90;
-      borderRadius = "16px"; // Medium rounded rectangle
+      width = 85;
+      height = 75;
+      borderRadius = "12px";
     } else if (cap > 4) {
-      width = 145;
-      height = 110;
-      borderRadius = "20px"; // Large rectangular table
+      width = 115;
+      height = 85;
+      borderRadius = "14px";
     }
+
+    // Clean table label (strips extra 'T' if table_number already starts with 'T')
+    const rawNum = String(t.table_number || "");
+    const tableLabel = rawNum.startsWith("T") ? rawNum : `T${rawNum}`;
 
     const style = `left:${Number(t.pos_x)}%; top:${Number(t.pos_y)}%; width:${width}px; height:${height}px; border-radius:${borderRadius}; position:absolute; transform:translate(-50%, -50%); display:flex; flex-direction:column; align-items:center; justify-content:center;`;
 
@@ -451,8 +455,8 @@ function tableButton(t) {
         style="${style}"
         ${booked ? "disabled" : ""}
         data-action="select-table" data-id="${esc(t.id)}"
-        title="${booked ? "Booked" : `Table ${t.table_number},${t.capacity} seats`}">
-        <span class="tn">T${esc(t.table_number)}</span>
+        title="${booked ? "Booked" : `Table ${tableLabel},${t.capacity} seats`}">
+        <span class="tn">${esc(tableLabel)}</span>
         <small>${esc(t.capacity)} seats</small>
       </button>
     `;
