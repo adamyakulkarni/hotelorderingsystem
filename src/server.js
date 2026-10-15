@@ -68,6 +68,12 @@ db.serialize(() => {
       FOREIGN KEY (table_id) REFERENCES tables(id)
     )
   `);
+  // Auto-migrate: Add missing 'status' column if it doesn't exist
+  db.run("ALTER TABLE tables ADD COLUMN status TEXT NOT NULL DEFAULT 'AVAILABLE'", (err) => {
+    if (err && !err.message.includes("duplicate column name")) {
+      console.log("Column 'status' already exists or altered.");
+    }
+  });
 });
 
 // Helper: Haversine distance formula (in km)
