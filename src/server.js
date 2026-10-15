@@ -126,12 +126,12 @@ app.get('/api/restaurants/:id/tables', (req, res) => {
 
     // Seed default floor plan if no tables exist in database for this restaurant
     if (!tables || tables.length === 0) {
-      const defaultTables = [
-        ["T1", 2, 20, 35], // Top-Left
-        ["T2", 4, 75, 35], // Top-Right
-        ["T3", 4, 20, 70], // Bottom-Left
-        ["T4", 6, 75, 70], // Bottom-Right
-      ];
+     const defaultTables = [
+      ["T1", 2, 28, 30], // Top Left
+      ["T2", 4, 72, 30], // Top Right
+      ["T3", 4, 28, 70], // Bottom Left
+      ["T4", 6, 72, 70], // Bottom Right
+     ];
 
       const stmt = db.prepare(
         "INSERT INTO tables (restaurant_id, table_number, capacity, pos_x, pos_y, status) VALUES (?, ?, ?, ?, ?, 'AVAILABLE')"
