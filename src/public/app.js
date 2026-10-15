@@ -859,7 +859,7 @@ document.addEventListener("click", e => {
           </div>
           <div class="two">
             <div class="field">
-              <label>Price ($)</label>
+              <label>Price (₹)</label>
               <input name="itemPrice" type="number" step="0.01" placeholder="8.99" required>
             </div>
             <div class="field">
