@@ -786,7 +786,7 @@ async function chooseRestaurant(id) {
 
   window.addEventListener("hashchange", handleRoute);
 
-  document.addEventListener("click", e => {
+document.addEventListener("click", e => {
     const actionBtn = e.target.closest("[data-action]");
     if (!actionBtn) return;
 
