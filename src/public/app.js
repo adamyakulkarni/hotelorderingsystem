@@ -429,21 +429,37 @@ function tableButton(t) {
     const selected = state.selectedTable && Number(state.selectedTable.id) === Number(t.id);
     const cap = Number(t.capacity) || 2;
 
-    // Clean label formatting
+    // Clean label formatting (strips duplicate 'T')
     const rawNum = String(t.table_number || "");
     const tableLabel = rawNum.startsWith("T") ? rawNum : `T${rawNum}`;
 
-    // Radius shape based on seats
-    const borderRadius = cap <= 2 ? "50%" : cap <= 4 ? "18px" : "24px";
+    // Dynamic dimensions matching seat count nicely
+    let w = 80, h = 80, radius = "50%"; // 2 seats
+    if (cap > 2 && cap <= 4) {
+      w = 110; h = 90; radius = "14px"; // 4 seats
+    } else if (cap > 4) {
+      w = 140; h = 100; radius = "18px"; // 6+ seats
+    }
+
+    // Spread coordinates evenly across the 4 corners of the canvas
+    let posX = Number(t.pos_x);
+    let posY = Number(t.pos_y);
+
+    if (t.table_number === "T1" || rawNum === "1") { posX = 25; posY = 30; }
+    if (t.table_number === "T2" || rawNum === "2") { posX = 75; posY = 30; }
+    if (t.table_number === "T3" || rawNum === "3") { posX = 25; posY = 70; }
+    if (t.table_number === "T4" || rawNum === "4") { posX = 75; posY = 70; }
+
+    const style = `left:${posX}%; top:${posY}%; width:${w}px; height:${h}px; border-radius:${radius}; position:absolute; transform:translate(-50%, -50%); display:flex; flex-direction:column; align-items:center; justify-content:center; box-sizing:border-box;`;
 
     return `
       <button type="button" class="tbl ${booked ? "booked" : selected ? "sel" : "avail"}"
-        style="width: 100%; height: 100%; min-height: 120px; border-radius: ${borderRadius}; display: flex; flex-direction: column; align-items: center; justify-content: center; justify-self: center; align-self: center;"
+        style="${style}"
         ${booked ? "disabled" : ""}
         data-action="select-table" data-id="${esc(t.id)}"
         title="${booked ? "Booked" : `Table ${tableLabel},${t.capacity} seats`}">
-        <span class="tn" style="font-size: 1.25rem; font-weight: 700;">${esc(tableLabel)}</span>
-        <small style="font-size: 0.9rem; opacity: 0.85;">${esc(t.capacity)} seats</small>
+        <span class="tn">${esc(tableLabel)}</span>
+        <small>${esc(t.capacity)} seats</small>
       </button>
     `;
   }
