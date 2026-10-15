@@ -68,15 +68,6 @@
     return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
   }
 
-  function minArrivalValue() {
-    return localDateTimeValue(nextHalfHour());
-  }
-
-  function maxArrivalValue() {
-    const d = new Date();
-    d.setDate(d.getDate() + 60);
-    return localDateTimeValue(d);
-  }
 
   function showBanner(message, type = "info") {
     if (!banner) return;
@@ -369,7 +360,7 @@
         <div class="controls">
           <div class="field">
             <label for="arrivalTime">Arrival time</label>
-            <input id="arrivalTime" type="datetime-local" min="${minArrivalValue()}" max="${maxArrivalValue()}" value="${esc(state.arrivalTime)}" step="1800">
+            <input id="arrivalTime" type="datetime-local" value="${esc(state.arrivalTime)}" step="1800">
             <span class="hint">Choose a 30-minute slot.</span>
           </div>
           <div class="field">
