@@ -424,18 +424,35 @@ function renderTables() {
     `;
   }
 
-  function tableButton(t) {
+function tableButton(t) {
     const booked = String(t.status).toUpperCase() === "BOOKED";
     const selected = state.selectedTable && Number(state.selectedTable.id) === Number(t.id);
-    const capClass = Number(t.capacity) <= 2 ? "cap-s" : Number(t.capacity) <= 4 ? "cap-m" : "cap-l";
+    const cap = Number(t.capacity) || 2;
+
+    // Dynamic width, height, and shape based on seat count
+    let width = 75;
+    let height = 75;
+    let borderRadius = "50%"; // Circular for 2-seaters
+
+    if (cap > 2 && cap <= 4) {
+      width = 105;
+      height = 90;
+      borderRadius = "16px"; // Medium rounded rectangle
+    } else if (cap > 4) {
+      width = 145;
+      height = 110;
+      borderRadius = "20px"; // Large rectangular table
+    }
+
+    const style = `left:${Number(t.pos_x)}%; top:${Number(t.pos_y)}%; width:${width}px; height:${height}px; border-radius:${borderRadius}; position:absolute; transform:translate(-50%, -50%); display:flex; flex-direction:column; align-items:center; justify-content:center;`;
 
     return `
-      <button type="button" class="tbl ${booked ? "booked" : selected ? "sel" : "avail"} ${capClass}"
-        style="left:${Number(t.pos_x)}%; top:${Number(t.pos_y)}%;"
+      <button type="button" class="tbl ${booked ? "booked" : selected ? "sel" : "avail"}"
+        style="${style}"
         ${booked ? "disabled" : ""}
         data-action="select-table" data-id="${esc(t.id)}"
         title="${booked ? "Booked" : `Table ${t.table_number},${t.capacity} seats`}">
-        <span class="tn">${esc(t.table_number)}</span>
+        <span class="tn">T${esc(t.table_number)}</span>
         <small>${esc(t.capacity)} seats</small>
       </button>
     `;
