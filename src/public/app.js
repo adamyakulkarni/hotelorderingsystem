@@ -870,6 +870,7 @@ document.addEventListener("click", e => {
     if (e.target.id === "arrivalTime") {
       state.arrivalTime = e.target.value;
       loadTables();
+       e.target.blur();
     }
   });
 
