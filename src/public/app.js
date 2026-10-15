@@ -350,12 +350,39 @@
     }
   }
 
-  function renderTables() {
+function renderTables() {
     const r = state.restaurant;
     const selected = state.selectedTable;
 
+    // 1. If the layout is already built, update only dynamic parts to preserve the time input state
+    const floorEl = $("#floor");
+    if (floorEl) {
+      floorEl.innerHTML = state.loading
+        ? `<p class="floor-msg">Checking table availability...</p>`
+        : state.tables.length
+        ? state.tables.map(tableButton).join("")
+        : `<p class="floor-msg">Choose an arrival time to see available tables.</p>`;
+
+      const selbarEl = $(".selbar");
+      if (selbarEl) {
+        selbarEl.innerHTML = `
+          <p>
+            ${selected
+              ? `<strong>Table ${esc(selected.table_number)}</strong> <span class="sub">Seats ${esc(selected.capacity)} people</span>`
+              : `Select an available table to continue.`
+            }
+          </p>
+          <button class="btn primary" type="button" data-action="continue-menu" ${selected ? "" : "disabled"}>
+            Continue to menu
+          </button>
+        `;
+      }
+      return;
+    }
+
+    // 2. Full initial render when navigating to the page for the first time
     app.innerHTML = `
-      ${pageHead(r?.name || "Choose a table", `${r?.address || ""} - ${formatDisplayDateTime(state.arrivalTime)}`, "discover")}
+      ${pageHead(r?.name || "Choose a table", `${r?.address \vert{}\vert{} ""} - ${formatDisplayDateTime(state.arrivalTime)}`, "discover")}
       <section class="panel">
         <div class="controls">
           <div class="field">
