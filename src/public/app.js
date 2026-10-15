@@ -364,7 +364,7 @@
     const selected = state.selectedTable;
 
     app.innerHTML = `
-      ${pageHead(r?.name || "Choose a table", `${r?.address \vert{}\vert{} ""} - ${formatDisplayDateTime(state.arrivalTime)}`, "discover")}
+      ${pageHead(r?.name || "Choose a table", `${r?.address || ""} - ${formatDisplayDateTime(state.arrivalTime)}`, "discover")}
       <section class="panel">
         <div class="controls">
           <div class="field">
