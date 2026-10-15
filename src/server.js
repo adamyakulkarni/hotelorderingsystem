@@ -127,10 +127,10 @@ app.get('/api/restaurants/:id/tables', (req, res) => {
     // Seed default floor plan if no tables exist in database for this restaurant
     if (!tables || tables.length === 0) {
       const defaultTables = [
-        ["T1", 2, 25, 30],
-        ["T2", 4, 60, 30],
-        ["T3", 4, 25, 70],
-        ["T4", 6, 60, 70],
+        ["T1", 2, 20, 35], // Top-Left
+        ["T2", 4, 75, 35], // Top-Right
+        ["T3", 4, 20, 70], // Bottom-Left
+        ["T4", 6, 75, 70], // Bottom-Right
       ];
 
       const stmt = db.prepare(
