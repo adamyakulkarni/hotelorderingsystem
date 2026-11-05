@@ -5,7 +5,7 @@ const CONFIG = {
   APP_NAME: "Tablemate",
   API_BASE: "http://localhost:3000",                // your Node/Express backend
   DEFAULT_LOCATION: { lat: 12.9716, lng: 77.5946 }, // used until the visitor shares their location
-  CURRENCY: "$",                                    // your sample prices look like dollars; change to "\u20B9" for rupees
+  CURRENCY: "₹",                                    // your sample prices look like dollars; change to "\u20B9" for rupees
   DEPOSIT_RATE: 0.20,                               // display only; the backend calculates the real deposit
 
   // Arrival time slots offered on the floor plan step
