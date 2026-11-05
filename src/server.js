@@ -1,3 +1,4 @@
+
 const express = require('express');
 const mysql = require('mysql2/promise');
 const path = require('path');
@@ -17,13 +18,17 @@ const pool = mysql.createPool({
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,
-  ssl: process.env.MYSQL_SSL === 'true' ? { rejectUnauthorized: false } : false
+  ssl: process.env.MYSQL_SSL === 'true'
+    ? { rejectUnauthorized: false }
+    : false
 });
 
-// Auto-Initialize MySQL Database Schema
+// Initialize MySQL Database Schema
 async function initDB() {
+  let connection;
+
   try {
-    const connection = await pool.getConnection();
+    connection = await pool.getConnection();
 
     await connection.query(`
       CREATE TABLE IF NOT EXISTS restaurants (
@@ -47,7 +52,8 @@ async function initDB() {
         pos_x DOUBLE NOT NULL DEFAULT 20,
         pos_y DOUBLE NOT NULL DEFAULT 20,
         status VARCHAR(20) NOT NULL DEFAULT 'AVAILABLE',
-        FOREIGN KEY (restaurant_id) REFERENCES restaurants(id) ON DELETE CASCADE
+        FOREIGN KEY (restaurant_id)
+          REFERENCES restaurants(id) ON DELETE CASCADE
       ) ENGINE=InnoDB;
     `);
 
@@ -60,7 +66,8 @@ async function initDB() {
         category VARCHAR(100) DEFAULT 'Main Course',
         description TEXT,
         image_url TEXT,
-        FOREIGN KEY (restaurant_id) REFERENCES restaurants(id) ON DELETE CASCADE
+        FOREIGN KEY (restaurant_id)
+          REFERENCES restaurants(id) ON DELETE CASCADE
       ) ENGINE=InnoDB;
     `);
 
@@ -74,28 +81,31 @@ async function initDB() {
         deposit_paid DOUBLE NOT NULL,
         order_items_json JSON,
         status VARCHAR(20) NOT NULL DEFAULT 'CONFIRMED',
-        FOREIGN KEY (restaurant_id) REFERENCES restaurants(id) ON DELETE CASCADE,
-        FOREIGN KEY (table_id) REFERENCES tables(id) ON DELETE CASCADE
+        FOREIGN KEY (restaurant_id)
+          REFERENCES restaurants(id) ON DELETE CASCADE,
+        FOREIGN KEY (table_id)
+          REFERENCES tables(id) ON DELETE CASCADE
       ) ENGINE=InnoDB;
     `);
 
-    connection.release();
     console.log("MySQL Database Connected & Schema Verified.");
-  } catch (err) {
-    console.error("MySQL Setup Error:", err.message);
+  } finally {
+    if (connection) connection.release();
   }
 }
-
-initDB();
 
 // Distance calculation formula
 function calculateDistance(lat1, lon1, lat2, lon2) {
   const R = 6371;
   const dLat = (lat2 - lat1) * (Math.PI / 180);
   const dLon = (lon2 - lon1) * (Math.PI / 180);
-  const a = Math.sin(dLat / 2) ** 2 +
-            Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) *
-            Math.sin(dLon / 2) ** 2;
+
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1 * (Math.PI / 180)) *
+    Math.cos(lat2 * (Math.PI / 180)) *
+    Math.sin(dLon / 2) ** 2;
+
   return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
 }
 
@@ -105,10 +115,15 @@ app.get('/api/restaurants/nearby', async (req, res) => {
     const userLat = parseFloat(req.query.lat) || 12.9716;
     const userLng = parseFloat(req.query.lng) || 77.5946;
 
-    const [rows] = await pool.query("SELECT * FROM restaurants");
+    const [rows] = await pool.query(
+      "SELECT * FROM restaurants"
+    );
+
     const results = rows.map(r => ({
       ...r,
-      distanceKm: parseFloat(calculateDistance(userLat, userLng, r.lat, r.lng).toFixed(2))
+      distanceKm: parseFloat(
+        calculateDistance(userLat, userLng, r.lat, r.lng).toFixed(2)
+      )
     })).sort((a, b) => a.distanceKm - b.distanceKm);
 
     res.json(results);
@@ -120,7 +135,11 @@ app.get('/api/restaurants/nearby', async (req, res) => {
 // 2. Get Menu
 app.get('/api/restaurants/:id/menu', async (req, res) => {
   try {
-    const [rows] = await pool.query("SELECT * FROM menu_items WHERE restaurant_id = ?", [req.params.id]);
+    const [rows] = await pool.query(
+      "SELECT * FROM menu_items WHERE restaurant_id = ?",
+      [req.params.id]
+    );
+
     res.json(rows);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -133,7 +152,10 @@ app.get('/api/restaurants/:id/tables', async (req, res) => {
     const restaurantId = req.params.id;
     const timeSlot = req.query.arrivalTime || req.query.time || "";
 
-    const [tables] = await pool.query("SELECT * FROM tables WHERE restaurant_id = ?", [restaurantId]);
+    const [tables] = await pool.query(
+      "SELECT * FROM tables WHERE restaurant_id = ?",
+      [restaurantId]
+    );
 
     // Seed default tables if venue has none
     if (!tables || tables.length === 0) {
@@ -141,31 +163,46 @@ app.get('/api/restaurants/:id/tables', async (req, res) => {
         [restaurantId, "T1", 2, 25, 30, 'AVAILABLE'],
         [restaurantId, "T2", 4, 75, 30, 'AVAILABLE'],
         [restaurantId, "T3", 4, 25, 70, 'AVAILABLE'],
-        [restaurantId, "T4", 6, 75, 70, 'AVAILABLE'],
+        [restaurantId, "T4", 6, 75, 70, 'AVAILABLE']
       ];
+
       await pool.query(
-        "INSERT INTO tables (restaurant_id, table_number, capacity, pos_x, pos_y, status) VALUES ?",
+        `INSERT INTO tables
+        (restaurant_id, table_number, capacity, pos_x, pos_y, status)
+        VALUES ?`,
         [defaultTables]
       );
     }
 
     if (!timeSlot) {
-      const [allTables] = await pool.query("SELECT *, 'AVAILABLE' as status FROM tables WHERE restaurant_id = ?", [restaurantId]);
+      const [allTables] = await pool.query(
+        `SELECT *, 'AVAILABLE' AS status
+         FROM tables WHERE restaurant_id = ?`,
+        [restaurantId]
+      );
+
       return res.json(allTables);
     }
 
     const query = `
-      SELECT t.*, 
-        CASE WHEN r.id IS NOT NULL THEN 'BOOKED' ELSE 'AVAILABLE' END as status
+      SELECT t.*,
+        CASE
+          WHEN r.id IS NOT NULL THEN 'BOOKED'
+          ELSE 'AVAILABLE'
+        END AS status
       FROM tables t
-      LEFT JOIN reservations r 
-        ON t.id = r.table_id 
-        AND r.arrival_time = ? 
+      LEFT JOIN reservations r
+        ON t.id = r.table_id
+        AND r.arrival_time = ?
         AND r.status = 'CONFIRMED'
       WHERE t.restaurant_id = ?
     `;
 
-    const [availabilityRows] = await pool.query(query, [timeSlot, restaurantId]);
+    const [availabilityRows] = await pool.query(
+      query,
+      [timeSlot, restaurantId]
+    );
+
     res.json(availabilityRows);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -175,27 +212,63 @@ app.get('/api/restaurants/:id/tables', async (req, res) => {
 // 4. Checkout Endpoint
 app.post('/api/checkout', async (req, res) => {
   try {
-    const { restaurantId, tableId, customerName, arrivalTime, cartItems } = req.body;
-    if (!restaurantId || !tableId || !customerName || !arrivalTime || !cartItems || cartItems.length === 0) {
-      return res.status(400).json({ error: "Missing required booking details or empty cart" });
+    const {
+      restaurantId,
+      tableId,
+      customerName,
+      arrivalTime,
+      cartItems
+    } = req.body;
+
+    if (
+      !restaurantId ||
+      !tableId ||
+      !customerName ||
+      !arrivalTime ||
+      !cartItems ||
+      cartItems.length === 0
+    ) {
+      return res.status(400).json({
+        error: "Missing required booking details or empty cart"
+      });
     }
 
     const [existing] = await pool.query(
-      `SELECT id FROM reservations WHERE table_id = ? AND arrival_time = ? AND status = 'CONFIRMED'`,
+      `SELECT id FROM reservations
+       WHERE table_id = ?
+       AND arrival_time = ?
+       AND status = 'CONFIRMED'`,
       [tableId, arrivalTime]
     );
 
     if (existing.length > 0) {
-      return res.status(409).json({ error: "Table is already booked for this time slot." });
+      return res.status(409).json({
+        error: "Table is already booked for this time slot."
+      });
     }
 
-    const totalAmount = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-    const depositAmount = parseFloat((totalAmount * 0.20).toFixed(2));
+    const totalAmount = cartItems.reduce(
+      (sum, item) => sum + (item.price * item.quantity),
+      0
+    );
+
+    const depositAmount = parseFloat(
+      (totalAmount * 0.20).toFixed(2)
+    );
 
     const [result] = await pool.query(
-      `INSERT INTO reservations (restaurant_id, table_id, customer_name, arrival_time, deposit_paid, order_items_json, status)
+      `INSERT INTO reservations
+       (restaurant_id, table_id, customer_name, arrival_time,
+        deposit_paid, order_items_json, status)
        VALUES (?, ?, ?, ?, ?, ?, 'CONFIRMED')`,
-      [restaurantId, tableId, customerName, arrivalTime, depositAmount, JSON.stringify(cartItems)]
+      [
+        restaurantId,
+        tableId,
+        customerName,
+        arrivalTime,
+        depositAmount,
+        JSON.stringify(cartItems)
+      ]
     );
 
     res.json({
@@ -205,6 +278,7 @@ app.post('/api/checkout', async (req, res) => {
       depositPaid: depositAmount,
       message: "Reservation confirmed successfully."
     });
+
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -213,18 +287,47 @@ app.post('/api/checkout', async (req, res) => {
 // 5. Register Endpoint
 const handleRegister = async (req, res) => {
   try {
-    const { name, address, lat, lng, imageUrl, openingTime, closingTime, menuItems } = req.body;
-    if (!name || !address || lat === undefined || lng === undefined) {
-      return res.status(400).json({ error: "Missing required fields" });
+    const {
+      name,
+      address,
+      lat,
+      lng,
+      imageUrl,
+      openingTime,
+      closingTime,
+      menuItems
+    } = req.body;
+
+    if (
+      !name ||
+      !address ||
+      lat === undefined ||
+      lng === undefined
+    ) {
+      return res.status(400).json({
+        error: "Missing required fields"
+      });
     }
 
-    const image = imageUrl || "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=500";
+    const image = imageUrl ||
+      "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=500";
+
     const open = openingTime || "09:00";
     const close = closingTime || "22:00";
 
     const [restResult] = await pool.query(
-      `INSERT INTO restaurants (name, lat, lng, address, image_url, opening_time, closing_time) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [name, parseFloat(lat), parseFloat(lng), address, image, open, close]
+      `INSERT INTO restaurants
+       (name, lat, lng, address, image_url, opening_time, closing_time)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [
+        name,
+        parseFloat(lat),
+        parseFloat(lng),
+        address,
+        image,
+        open,
+        close
+      ]
     );
 
     const restaurantId = restResult.insertId;
@@ -233,10 +336,13 @@ const handleRegister = async (req, res) => {
       [restaurantId, "T1", 2, 25, 30, 'AVAILABLE'],
       [restaurantId, "T2", 4, 75, 30, 'AVAILABLE'],
       [restaurantId, "T3", 4, 25, 70, 'AVAILABLE'],
-      [restaurantId, "T4", 6, 75, 70, 'AVAILABLE'],
+      [restaurantId, "T4", 6, 75, 70, 'AVAILABLE']
     ];
+
     await pool.query(
-      "INSERT INTO tables (restaurant_id, table_number, capacity, pos_x, pos_y, status) VALUES ?",
+      `INSERT INTO tables
+       (restaurant_id, table_number, capacity, pos_x, pos_y, status)
+       VALUES ?`,
       [defaultTables]
     );
 
@@ -249,13 +355,21 @@ const handleRegister = async (req, res) => {
         item.description || '',
         item.imageUrl || ''
       ]);
+
       await pool.query(
-        `INSERT INTO menu_items (restaurant_id, name, price, category, description, image_url) VALUES ?`,
+        `INSERT INTO menu_items
+         (restaurant_id, name, price, category, description, image_url)
+         VALUES ?`,
         [menuRows]
       );
     }
 
-    res.json({ success: true, restaurantId, message: `Restaurant '${name}' onboarded successfully!` });
+    res.json({
+      success: true,
+      restaurantId,
+      message: `Restaurant '${name}' onboarded successfully!`
+    });
+
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -264,8 +378,27 @@ const handleRegister = async (req, res) => {
 app.post('/api/restaurants/register', handleRegister);
 app.post('/api/partners/register', handleRegister);
 
+// Serve frontend
 app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, '../src/public/index.html'));
+  res.sendFile(
+    path.join(__dirname, '../src/public/index.html')
+  );
 });
 
+// Start Server
+const PORT = process.env.PORT || 3000;
 
+async function startServer() {
+  try {
+    await initDB();
+
+    app.listen(PORT, () => {
+      console.log(`Backend API running on http://localhost:${PORT}`);
+    });
+  } catch (err) {
+    console.error("Server startup failed:", err.message);
+    process.exit(1);
+  }
+}
+
+startServer();
