@@ -1,84 +1,94 @@
-// src/server.js
 const express = require('express');
-const sqlite3 = require('sqlite3').verbose();
+const mysql = require('mysql2/promise');
 const path = require('path');
+require('dotenv').config();
 
-// 1. Initialize Express App
 const app = express();
-
-// 2. Middleware & Static Asset Hosting
 app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname, '../src/public')));
 
-// 3. Database Connection & Schema Setup
-const dbPath = path.join(__dirname, '..', 'database.db');
-const db = new sqlite3.Database(dbPath);
-
-db.serialize(() => {
-  // Base Tables Setup
-  db.run(`
-    CREATE TABLE IF NOT EXISTS restaurants (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name TEXT NOT NULL,
-      address TEXT NOT NULL,
-      lat REAL NOT NULL,
-      lng REAL NOT NULL,
-      image_url TEXT,
-      opening_time TEXT DEFAULT '09:00',
-      closing_time TEXT DEFAULT '22:00'
-    )
-  `);
-
-  db.run(`
-    CREATE TABLE IF NOT EXISTS tables (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      restaurant_id INTEGER NOT NULL,
-      table_number TEXT NOT NULL,
-      capacity INTEGER NOT NULL DEFAULT 4,
-      pos_x REAL NOT NULL DEFAULT 20,
-      pos_y REAL NOT NULL DEFAULT 20,
-      status TEXT NOT NULL DEFAULT 'AVAILABLE',
-      FOREIGN KEY (restaurant_id) REFERENCES restaurants(id)
-    )
-  `);
-
-  db.run(`
-    CREATE TABLE IF NOT EXISTS menu_items (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      restaurant_id INTEGER NOT NULL,
-      name TEXT NOT NULL,
-      price REAL NOT NULL,
-      category TEXT DEFAULT 'Main Course',
-      description TEXT DEFAULT '',
-      image_url TEXT DEFAULT '',
-      FOREIGN KEY (restaurant_id) REFERENCES restaurants(id)
-    )
-  `);
-
-  db.run(`
-    CREATE TABLE IF NOT EXISTS reservations (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      restaurant_id INTEGER NOT NULL,
-      table_id INTEGER NOT NULL,
-      customer_name TEXT NOT NULL,
-      arrival_time TEXT NOT NULL,
-      deposit_paid REAL NOT NULL,
-      order_items_json TEXT,
-      status TEXT NOT NULL DEFAULT 'CONFIRMED',
-      FOREIGN KEY (restaurant_id) REFERENCES restaurants(id),
-      FOREIGN KEY (table_id) REFERENCES tables(id)
-    )
-  `);
-
-  // Schema Migrations (Ensures columns exist if database file was created on an older version)
-  db.run("ALTER TABLE menu_items ADD COLUMN description TEXT DEFAULT ''", () => {});
-  db.run("ALTER TABLE menu_items ADD COLUMN image_url TEXT DEFAULT ''", () => {});
-  db.run("ALTER TABLE restaurants ADD COLUMN opening_time TEXT DEFAULT '09:00'", () => {});
-  db.run("ALTER TABLE restaurants ADD COLUMN closing_time TEXT DEFAULT '22:00'", () => {});
-  db.run("ALTER TABLE tables ADD COLUMN status TEXT NOT NULL DEFAULT 'AVAILABLE'", () => {});
+// Create MySQL Connection Pool
+const pool = mysql.createPool({
+  host: process.env.MYSQL_HOST,
+  user: process.env.MYSQL_USER,
+  password: process.env.MYSQL_PASSWORD,
+  database: process.env.MYSQL_DATABASE,
+  port: process.env.MYSQL_PORT || 3306,
+  waitForConnections: true,
+  connectionLimit: 10,
+  queueLimit: 0,
+  ssl: process.env.MYSQL_SSL === 'true' ? { rejectUnauthorized: false } : false
 });
 
-// Helper: Haversine distance formula (in km)
+// Auto-Initialize MySQL Database Schema
+async function initDB() {
+  try {
+    const connection = await pool.getConnection();
+
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS restaurants (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        address TEXT NOT NULL,
+        lat DOUBLE NOT NULL,
+        lng DOUBLE NOT NULL,
+        image_url TEXT,
+        opening_time VARCHAR(10) DEFAULT '09:00',
+        closing_time VARCHAR(10) DEFAULT '22:00'
+      ) ENGINE=InnoDB;
+    `);
+
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS tables (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        restaurant_id INT NOT NULL,
+        table_number VARCHAR(50) NOT NULL,
+        capacity INT NOT NULL DEFAULT 4,
+        pos_x DOUBLE NOT NULL DEFAULT 20,
+        pos_y DOUBLE NOT NULL DEFAULT 20,
+        status VARCHAR(20) NOT NULL DEFAULT 'AVAILABLE',
+        FOREIGN KEY (restaurant_id) REFERENCES restaurants(id) ON DELETE CASCADE
+      ) ENGINE=InnoDB;
+    `);
+
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS menu_items (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        restaurant_id INT NOT NULL,
+        name VARCHAR(255) NOT NULL,
+        price DOUBLE NOT NULL,
+        category VARCHAR(100) DEFAULT 'Main Course',
+        description TEXT,
+        image_url TEXT,
+        FOREIGN KEY (restaurant_id) REFERENCES restaurants(id) ON DELETE CASCADE
+      ) ENGINE=InnoDB;
+    `);
+
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS reservations (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        restaurant_id INT NOT NULL,
+        table_id INT NOT NULL,
+        customer_name VARCHAR(255) NOT NULL,
+        arrival_time VARCHAR(100) NOT NULL,
+        deposit_paid DOUBLE NOT NULL,
+        order_items_json JSON,
+        status VARCHAR(20) NOT NULL DEFAULT 'CONFIRMED',
+        FOREIGN KEY (restaurant_id) REFERENCES restaurants(id) ON DELETE CASCADE,
+        FOREIGN KEY (table_id) REFERENCES tables(id) ON DELETE CASCADE
+      ) ENGINE=InnoDB;
+    `);
+
+    connection.release();
+    console.log("MySQL Database Connected & Schema Verified.");
+  } catch (err) {
+    console.error("MySQL Setup Error:", err.message);
+  }
+}
+
+initDB();
+
+// Distance calculation formula
 function calculateDistance(lat1, lon1, lat2, lon2) {
   const R = 6371;
   const dLat = (lat2 - lat1) * (Math.PI / 180);
@@ -89,196 +99,173 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
   return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
 }
 
-// 1. Nearby Restaurants API
-app.get('/api/restaurants/nearby', (req, res) => {
-  const userLat = parseFloat(req.query.lat) || 12.9716;
-  const userLng = parseFloat(req.query.lng) || 77.5946;
+// 1. Get Nearby Restaurants
+app.get('/api/restaurants/nearby', async (req, res) => {
+  try {
+    const userLat = parseFloat(req.query.lat) || 12.9716;
+    const userLng = parseFloat(req.query.lng) || 77.5946;
 
-  db.all("SELECT * FROM restaurants", [], (err, rows) => {
-    if (err) return res.status(500).json({ error: err.message });
-
+    const [rows] = await pool.query("SELECT * FROM restaurants");
     const results = rows.map(r => ({
       ...r,
       distanceKm: parseFloat(calculateDistance(userLat, userLng, r.lat, r.lng).toFixed(2))
     })).sort((a, b) => a.distanceKm - b.distanceKm);
 
     res.json(results);
-  });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-// 2. Fetch Menu Items for a Restaurant
-app.get('/api/restaurants/:id/menu', (req, res) => {
-  const restaurantId = req.params.id;
-  db.all("SELECT * FROM menu_items WHERE restaurant_id = ?", [restaurantId], (err, rows) => {
-    if (err) return res.status(500).json({ error: err.message });
+// 2. Get Menu
+app.get('/api/restaurants/:id/menu', async (req, res) => {
+  try {
+    const [rows] = await pool.query("SELECT * FROM menu_items WHERE restaurant_id = ?", [req.params.id]);
     res.json(rows);
-  });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-// 3. Real-time Floorplan & Table Availability API
-app.get('/api/restaurants/:id/tables', (req, res) => {
-  const restaurantId = req.params.id;
-  const timeSlot = req.query.arrivalTime || req.query.time || "";
+// 3. Get Tables & Slot Availability
+app.get('/api/restaurants/:id/tables', async (req, res) => {
+  try {
+    const restaurantId = req.params.id;
+    const timeSlot = req.query.arrivalTime || req.query.time || "";
 
-  // Check if tables exist for this restaurant
-  db.all("SELECT * FROM tables WHERE restaurant_id = ?", [restaurantId], (err, tables) => {
-    if (err) return res.status(500).json({ error: err.message });
+    const [tables] = await pool.query("SELECT * FROM tables WHERE restaurant_id = ?", [restaurantId]);
 
-    // Seed default floor plan if no tables exist in database for this restaurant
+    // Seed default tables if venue has none
     if (!tables || tables.length === 0) {
-     const defaultTables = [
-      ["T1", 2, 28, 30], // Top Left
-      ["T2", 4, 72, 30], // Top Right
-      ["T3", 4, 28, 70], // Bottom Left
-      ["T4", 6, 72, 70], // Bottom Right
-     ];
-
-      const stmt = db.prepare(
-        "INSERT INTO tables (restaurant_id, table_number, capacity, pos_x, pos_y, status) VALUES (?, ?, ?, ?, ?, 'AVAILABLE')"
-      );
-      defaultTables.forEach(([num, cap, x, y]) => stmt.run(restaurantId, num, cap, x, y));
-      stmt.finalize(() => {
-        fetchTablesWithAvailability(restaurantId, timeSlot, res);
-      });
-      return;
-    }
-
-    fetchTablesWithAvailability(restaurantId, timeSlot, res);
-  });
-});
-
-function fetchTablesWithAvailability(restaurantId, timeSlot, res) {
-  if (!timeSlot) {
-    db.all("SELECT *, 'AVAILABLE' as status FROM tables WHERE restaurant_id = ?", [restaurantId], (err, rows) => {
-      if (err) return res.status(500).json({ error: err.message });
-      return res.json(rows);
-    });
-    return;
-  }
-
-  const query = `
-    SELECT t.*, 
-      CASE WHEN r.id IS NOT NULL THEN 'BOOKED' ELSE 'AVAILABLE' END as status
-    FROM tables t
-    LEFT JOIN reservations r 
-      ON t.id = r.table_id 
-      AND r.arrival_time = ? 
-      AND r.status = 'CONFIRMED'
-    WHERE t.restaurant_id = ?
-  `;
-
-  db.all(query, [timeSlot, restaurantId], (err, rows) => {
-    if (err) return res.status(500).json({ error: err.message });
-    res.json(rows);
-  });
-}
-
-// 4. Pre-order Deposit & Booking Checkout API
-app.post('/api/checkout', (req, res) => {
-  const { restaurantId, tableId, customerName, arrivalTime, cartItems } = req.body;
-
-  if (!restaurantId || !tableId || !customerName || !arrivalTime || !cartItems || cartItems.length === 0) {
-    return res.status(400).json({ error: "Missing required booking details or empty cart" });
-  }
-
-  // Double-booking check
-  db.get(
-    `SELECT id FROM reservations WHERE table_id = ? AND arrival_time = ? AND status = 'CONFIRMED'`,
-    [tableId, arrivalTime],
-    (err, row) => {
-      if (err) return res.status(500).json({ error: err.message });
-      if (row) {
-        return res.status(409).json({ error: "Table is already booked for this time slot." });
-      }
-
-      // Calculate food subtotal and 20% deposit
-      const totalAmount = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-      const depositAmount = parseFloat((totalAmount * 0.20).toFixed(2));
-
-      const stmt = db.prepare(`
-        INSERT INTO reservations (restaurant_id, table_id, customer_name, arrival_time, deposit_paid, order_items_json, status)
-        VALUES (?, ?, ?, ?, ?, ?, 'CONFIRMED')
-      `);
-
-      stmt.run(
-        [restaurantId, tableId, customerName, arrivalTime, depositAmount, JSON.stringify(cartItems)],
-        function (err) {
-          if (err) return res.status(500).json({ error: err.message });
-
-          res.json({
-            success: true,
-            bookingId: this.lastID,
-            totalAmount: parseFloat(totalAmount.toFixed(2)),
-            depositPaid: depositAmount,
-            message: "Reservation confirmed and deposit processed successfully."
-          });
-        }
+      const defaultTables = [
+        [restaurantId, "T1", 2, 25, 30, 'AVAILABLE'],
+        [restaurantId, "T2", 4, 75, 30, 'AVAILABLE'],
+        [restaurantId, "T3", 4, 25, 70, 'AVAILABLE'],
+        [restaurantId, "T4", 6, 75, 70, 'AVAILABLE'],
+      ];
+      await pool.query(
+        "INSERT INTO tables (restaurant_id, table_number, capacity, pos_x, pos_y, status) VALUES ?",
+        [defaultTables]
       );
     }
-  );
+
+    if (!timeSlot) {
+      const [allTables] = await pool.query("SELECT *, 'AVAILABLE' as status FROM tables WHERE restaurant_id = ?", [restaurantId]);
+      return res.json(allTables);
+    }
+
+    const query = `
+      SELECT t.*, 
+        CASE WHEN r.id IS NOT NULL THEN 'BOOKED' ELSE 'AVAILABLE' END as status
+      FROM tables t
+      LEFT JOIN reservations r 
+        ON t.id = r.table_id 
+        AND r.arrival_time = ? 
+        AND r.status = 'CONFIRMED'
+      WHERE t.restaurant_id = ?
+    `;
+
+    const [availabilityRows] = await pool.query(query, [timeSlot, restaurantId]);
+    res.json(availabilityRows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-// 5. Onboard New Restaurant Handler
-function handleRegister(req, res) {
-  const { name, address, lat, lng, imageUrl, openingTime, closingTime, menuItems } = req.body;
+// 4. Checkout Endpoint
+app.post('/api/checkout', async (req, res) => {
+  try {
+    const { restaurantId, tableId, customerName, arrivalTime, cartItems } = req.body;
+    if (!restaurantId || !tableId || !customerName || !arrivalTime || !cartItems || cartItems.length === 0) {
+      return res.status(400).json({ error: "Missing required booking details or empty cart" });
+    }
 
-  if (!name || !address || lat === undefined || lng === undefined) {
-    return res.status(400).json({ error: "Missing required fields: name, address, lat, lng" });
-  }
-
-  const image = imageUrl || "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=500";
-  const open = openingTime || "09:00";
-  const close = closingTime || "22:00";
-
-  const sql = `INSERT INTO restaurants (name, lat, lng, address, image_url, opening_time, closing_time) VALUES (?, ?, ?, ?, ?, ?, ?)`;
-
-  db.run(sql, [name, parseFloat(lat), parseFloat(lng), address, image, open, close], function (err) {
-    if (err) return res.status(500).json({ error: err.message });
-
-    const restaurantId = this.lastID;
-
-    // Seed default floor plan for newly registered restaurant
-    const defaultTables = [
-      ["T1", 2, 25, 30],
-      ["T2", 4, 60, 30],
-      ["T3", 4, 25, 70],
-      ["T4", 6, 60, 70],
-    ];
-    const tableStmt = db.prepare(
-      "INSERT INTO tables (restaurant_id, table_number, capacity, pos_x, pos_y, status) VALUES (?, ?, ?, ?, ?, 'AVAILABLE')"
+    const [existing] = await pool.query(
+      `SELECT id FROM reservations WHERE table_id = ? AND arrival_time = ? AND status = 'CONFIRMED'`,
+      [tableId, arrivalTime]
     );
-    defaultTables.forEach(([num, cap, x, y]) => tableStmt.run(restaurantId, num, cap, x, y));
-    tableStmt.finalize();
 
-    // Save menu items with descriptions & image URLs
-    if (Array.isArray(menuItems) && menuItems.length > 0) {
-      const menuStmt = db.prepare(
-        `INSERT INTO menu_items (restaurant_id, name, price, category, description, image_url) VALUES (?, ?, ?, ?, ?, ?)`
-      );
-      menuItems.forEach(item => {
-        menuStmt.run([
-          restaurantId,
-          item.name,
-          parseFloat(item.price),
-          item.category || 'Main Course',
-          item.description || '',
-          item.imageUrl || ''
-        ]);
-      });
-      menuStmt.finalize();
+    if (existing.length > 0) {
+      return res.status(409).json({ error: "Table is already booked for this time slot." });
     }
+
+    const totalAmount = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    const depositAmount = parseFloat((totalAmount * 0.20).toFixed(2));
+
+    const [result] = await pool.query(
+      `INSERT INTO reservations (restaurant_id, table_id, customer_name, arrival_time, deposit_paid, order_items_json, status)
+       VALUES (?, ?, ?, ?, ?, ?, 'CONFIRMED')`,
+      [restaurantId, tableId, customerName, arrivalTime, depositAmount, JSON.stringify(cartItems)]
+    );
 
     res.json({
       success: true,
-      restaurantId: restaurantId,
-      message: `Restaurant '${name}' onboarded successfully!`
+      bookingId: result.insertId,
+      totalAmount: parseFloat(totalAmount.toFixed(2)),
+      depositPaid: depositAmount,
+      message: "Reservation confirmed successfully."
     });
-  });
-}
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
-// Support both endpoint paths
+// 5. Register Endpoint
+const handleRegister = async (req, res) => {
+  try {
+    const { name, address, lat, lng, imageUrl, openingTime, closingTime, menuItems } = req.body;
+    if (!name || !address || lat === undefined || lng === undefined) {
+      return res.status(400).json({ error: "Missing required fields" });
+    }
+
+    const image = imageUrl || "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=500";
+    const open = openingTime || "09:00";
+    const close = closingTime || "22:00";
+
+    const [restResult] = await pool.query(
+      `INSERT INTO restaurants (name, lat, lng, address, image_url, opening_time, closing_time) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [name, parseFloat(lat), parseFloat(lng), address, image, open, close]
+    );
+
+    const restaurantId = restResult.insertId;
+
+    const defaultTables = [
+      [restaurantId, "T1", 2, 25, 30, 'AVAILABLE'],
+      [restaurantId, "T2", 4, 75, 30, 'AVAILABLE'],
+      [restaurantId, "T3", 4, 25, 70, 'AVAILABLE'],
+      [restaurantId, "T4", 6, 75, 70, 'AVAILABLE'],
+    ];
+    await pool.query(
+      "INSERT INTO tables (restaurant_id, table_number, capacity, pos_x, pos_y, status) VALUES ?",
+      [defaultTables]
+    );
+
+    if (Array.isArray(menuItems) && menuItems.length > 0) {
+      const menuRows = menuItems.map(item => [
+        restaurantId,
+        item.name,
+        parseFloat(item.price),
+        item.category || 'Main Course',
+        item.description || '',
+        item.imageUrl || ''
+      ]);
+      await pool.query(
+        `INSERT INTO menu_items (restaurant_id, name, price, category, description, image_url) VALUES ?`,
+        [menuRows]
+      );
+    }
+
+    res.json({ success: true, restaurantId, message: `Restaurant '${name}' onboarded successfully!` });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
 app.post('/api/restaurants/register', handleRegister);
 app.post('/api/partners/register', handleRegister);
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Backend API running on http://localhost:${PORT}`));
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, '../src/public/index.html'));
+});
+
+module.exports = app;
